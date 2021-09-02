@@ -9,12 +9,17 @@ Its purpose is to demonstrate algorithms and make it easy to iterate on features
 
 ## Requirements
 
-This code was written and tested using [Python 3.9.5](https://www.python.org/downloads/release/python-395/).
-Some features may not work as expected on older versions.
+This code requires an active [Python 3 release](https://devguide.python.org/#status-of-python-branches).
 
 Install all required non-standard packages: `pip3 install -r requirements.txt`
 
 
 ## Testing
 
-Run the test suite: `python3 -m unittest discover`
+A test workflow in this repository runs against all active Python 3 release minor versions.
+
+![Test status](../../actions/workflows/test.yml/badge.svg)
+
+Run the test suite locally using either:
+- `python3 -m unittest discover`
+- `pytest`
