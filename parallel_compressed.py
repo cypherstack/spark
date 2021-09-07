@@ -1,11 +1,11 @@
-# Parallel one-of-many Groth/Bootle-type proving system
+# Parallel compressed one-of-many Groth/Bootle-type proving system
 #
 # {F,{S,V} ; (l,s,v) | S_l = sF, V_l = vF}
 
 from dumb25519 import *
 import transcript
 
-class ParallelParameters:
+class ParallelCompressedParameters:
 	def __init__(self,F,n,m):
 		if not isinstance(F,Point):
 			raise TypeError('Bad type for parameter F!')
@@ -18,9 +18,9 @@ class ParallelParameters:
 		self.n = n
 		self.m = m
 
-class ParallelStatement:
+class ParallelCompressedStatement:
 	def __init__(self,params,S,V):
-		if not isinstance(params,ParallelParameters):
+		if not isinstance(params,ParallelCompressedParameters):
 			raise TypeError('Bad type for parameters!')
 		n = params.n
 		m = params.m
@@ -36,7 +36,7 @@ class ParallelStatement:
 		self.V = V
 		self.Gi = [PointVector([hash_to_point('Gi',j,i) for i in range(n)]) for j in range(m)]
 
-class ParallelWitness:
+class ParallelCompressedWitness:
 	def __init__(self,l,s,v):
 		if not isinstance(l,int):
 			raise TypeError('Bad type for parallel witness l!')
@@ -49,8 +49,8 @@ class ParallelWitness:
 		self.s = s
 		self.v = v
 
-class ParallelProof:
-	def __init__(self,A,B,C,D,Gs,Gv,f,zA,zC,zS,zV):
+class ParallelCompressedProof:
+	def __init__(self,A,B,C,D,G,f,zA,zC,z):
 		if not isinstance(A,Point):
 			raise TypeError('Bad type for parallel proof element A!')
 		if not isinstance(B,Point):
@@ -59,10 +59,8 @@ class ParallelProof:
 			raise TypeError('Bad type for parallel proof element C!')
 		if not isinstance(D,Point):
 			raise TypeError('Bad type for parallel proof element D!')
-		if not isinstance(Gs,PointVector):
-			raise TypeError('Bad type for parallel proof element Gs!')
-		if not isinstance(Gv,PointVector):
-			raise TypeError('Bad type for parallel proof element Gv!')
+		if not isinstance(G,PointVector):
+			raise TypeError('Bad type for parallel proof element G!')
 		if not isinstance(f,list):
 			raise TypeError('Bad type for parallel proof element f!')
 		for f_ in f:
@@ -72,22 +70,18 @@ class ParallelProof:
 			raise TypeError('Bad type for parallel proof element zA!')
 		if not isinstance(zC,Scalar):
 			raise TypeError('Bad type for parallel proof element zC!')
-		if not isinstance(zS,Scalar):
-			raise TypeError('Bad type for parallel proof element zS!')
-		if not isinstance(zV,Scalar):
-			raise TypeError('Bad type for parallel proof element zV!')
+		if not isinstance(z,Scalar):
+			raise TypeError('Bad type for parallel proof element z!')
 
 		self.A = A
 		self.B = B
 		self.C = C
 		self.D = D
-		self.Gs = Gs
-		self.Gv = Gv
+		self.G = G
 		self.f = f
 		self.zA = zA
 		self.zC = zC
-		self.zS = zS
-		self.zV = zV
+		self.z = z
 
 # Pedersen matrix commitment
 def com_matrix(Gi,F,v,r):
@@ -126,9 +120,9 @@ def decompose(val,base,size):
 
 # Perform a commitment-to-zero proof
 def prove(statement,witness):
-	if not isinstance(statement,ParallelStatement):
+	if not isinstance(statement,ParallelCompressedStatement):
 		raise TypeError('Bad type for parallel statement!')
-	if not isinstance(witness,ParallelWitness):
+	if not isinstance(witness,ParallelCompressedWitness):
 		raise TypeError('Bad type for parallel witness!')
 	
 	# Check the statement validity
@@ -189,18 +183,6 @@ def prove(statement,witness):
 		for j in range(1,m):
 			p[k] = convolve(p[k],[a[j][decomp_k[j]],delta(decomp_l[j],decomp_k[j])])
 
-	# Generate proof values
-	Gs = PointVector([Z for _ in range(m)])
-	Gv = PointVector([Z for _ in range(m)])
-	rho_S = ScalarVector([random_scalar() for _ in range(m)])
-	rho_V = ScalarVector([random_scalar() for _ in range(m)])
-	for j in range(m):
-		for i in range(N):
-			Gs[j] += statement.S[i]*p[i][j]
-			Gv[j] += statement.V[i]*p[i][j]
-		Gs[j] += rho_S[j]*statement.F
-		Gv[j] += rho_V[j]*statement.F
-
 	# Challenge
 	tr = transcript.Transcript('Parallel Groth/Bootle')
 	tr.update(statement.F)
@@ -212,9 +194,18 @@ def prove(statement,witness):
 	tr.update(B)
 	tr.update(C)
 	tr.update(D)
-	tr.update(Gs)
-	tr.update(Gv)
+	mu = tr.challenge()
 
+	# Generate proof values
+	G = PointVector([Z for _ in range(m)])
+	rho = ScalarVector([random_scalar() for _ in range(m)])
+	for j in range(m):
+		for i in range(N):
+			G[j] += (statement.S[i] + mu*statement.V[i])*p[i][j]
+		G[j] += rho[j]*statement.F
+
+	# Challenge
+	tr.update(G)
 	x = tr.challenge()
 
 	f = [ScalarVector([Scalar(0) for _ in range(n-1)]) for _ in range(m)]
@@ -224,20 +215,18 @@ def prove(statement,witness):
 
 	zA = rB*x + rA
 	zC = rC*x + rD
-	zS = witness.s*x**m
-	zV = witness.v*x**m
+	z = (witness.s + mu*witness.v)*x**m
 	for j in range(m):
-		zS -= rho_S[j]*x**j
-		zV -= rho_V[j]*x**j
+		z -= rho[j]*x**j
 	
-	return ParallelProof(A,B,C,D,Gs,Gv,f,zA,zC,zS,zV)
+	return ParallelCompressedProof(A,B,C,D,G,f,zA,zC,z)
 
 # Verify a commitment-to-zero proof
 def verify(statement,proof):
 	# Check statement consistency
-	if not isinstance(statement,ParallelStatement):
+	if not isinstance(statement,ParallelCompressedStatement):
 		raise TypeError('Bad type for parallel statement!')
-	if not isinstance(proof,ParallelProof):
+	if not isinstance(proof,ParallelCompressedProof):
 		raise TypeError('Bad type for parallel proof!')
 	
 	n = statement.n
@@ -245,7 +234,7 @@ def verify(statement,proof):
 	N = n**m
 	f = [[Scalar(0) for _ in range(n)] for _ in range(m)]
 
-	# Transcript and challenge
+	# Transcript and challenges
 	tr = transcript.Transcript('Parallel Groth/Bootle')
 	tr.update(statement.F)
 	tr.update(n)
@@ -256,9 +245,8 @@ def verify(statement,proof):
 	tr.update(proof.B)
 	tr.update(proof.C)
 	tr.update(proof.D)
-	tr.update(proof.Gs)
-	tr.update(proof.Gv)
-
+	mu = tr.challenge()
+	tr.update(proof.G)
 	x = tr.challenge()
 
 	# Matrix reconstruction
@@ -281,25 +269,21 @@ def verify(statement,proof):
 		raise ArithmeticError('Failed parallel C/D check!')
 
 	# Commitment check
-	scalars_S = ScalarVector([])
-	points_S = PointVector([])
-	scalars_V = ScalarVector([])
-	points_V = PointVector([])
+	scalars = ScalarVector([])
+	points = PointVector([])
 	for i in range(N):
 		s = Scalar(1)
 		decomp_i = decompose(i,n,m)
 		for j in range(m):
 			s *= f[j][decomp_i[j]]
-		scalars_S.append(s)
-		scalars_V.append(s)
-		points_S.append(statement.S[i])
-		points_V.append(statement.V[i])
+		scalars.append(s)
+		points.append(statement.S[i])
+		scalars.append(mu*s)
+		points.append(statement.V[i])
 	for j in range(m):
-		scalars_S.append(-x**j)
-		points_S.append(proof.Gs[j])
-		scalars_V.append(-x**j)
-		points_V.append(proof.Gv[j])
-	if not multiexp(scalars_S,points_S) == proof.zS*statement.F or not multiexp(scalars_V,points_V) == proof.zV*statement.F:
+		scalars.append(-x**j)
+		points.append(proof.G[j])
+	if not multiexp(scalars,points) == proof.z*statement.F:
 		raise ArithmeticError('Failed parallel commitment check!')
 
 	return True
