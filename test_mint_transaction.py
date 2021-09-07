@@ -10,7 +10,7 @@ class TestMint(unittest.TestCase):
 		address_params = address.AddressParameters(protocol_params.G,protocol_params.F)
 
 		# Mint data
-		_,_,_,_,public = address.generate(address_params)
+		_,_,_,public = address.generate(address_params)
 		value = randrange(0,2**protocol_params.N)
 		memo = 'Mint memo'
 

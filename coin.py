@@ -153,18 +153,16 @@ class Coin:
 
 		self.recovered = True
 	
-	def delegate(self,params,full,delegation,id):
+	def delegate(self,params,full,id):
 		if not isinstance(params,CoinParameters):
 			raise TypeError('Bad type for coin parameters!')
 		if not isinstance(full,address.FullViewKey):
 			raise TypeError('Bad type for full view key!')
-		if not isinstance(delegation,address.ProofDelegationKey):
-			raise TypeError('Bad type for proof delegation key!')
 		if not self.recovered:
 			raise ValueError('Delegation requires coin recovery!')
 		
 		s1 = hash_to_scalar('ser1',id,self.s,full.s1,full.s2)
-		S1 = self.s*params.G - hash_to_scalar('ser1',id,self.s,full.s1,full.s2)*params.F + delegation.D
+		S1 = self.s*params.G - hash_to_scalar('ser1',id,self.s,full.s1,full.s2)*params.F + full.D
 		c1 = hash_to_scalar('val',full.s1*self.K) - hash_to_scalar('val1',id,self.s,full.s1,full.s2)
 		C1 = self.value*params.G + hash_to_scalar('val1',id,self.s,full.s1,full.s2)*params.F
 

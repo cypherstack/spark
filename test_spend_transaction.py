@@ -27,7 +27,7 @@ class TestSpend(unittest.TestCase):
 		coin_params = coin.CoinParameters(protocol_params.G,protocol_params.F,protocol_params.H,protocol_params.N)
 
 		# Address
-		spend,full,_,delegation,public = address.generate(address_params)
+		spend,full,_,public = address.generate(address_params)
 
 		# Generate the input set and real coins
 		inputs = []
@@ -44,7 +44,7 @@ class TestSpend(unittest.TestCase):
 				False
 			)
 			inputs[l[u]].recover(coin_params,public,full)
-			inputs[l[u]].delegate(coin_params,full,delegation,delegation_id)
+			inputs[l[u]].delegate(coin_params,full,delegation_id)
 
 		# Generate the output coins and fee
 		outputs = []
