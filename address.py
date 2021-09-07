@@ -26,12 +26,15 @@ class SpendKey:
 		self.r = r
 
 class FullViewKey:
-	def __init__(self,spend):
+	def __init__(self,params,spend):
+		if not isinstance(params,AddressParameters):
+			raise TypeError('Bad type for parameters!')
 		if not isinstance(spend,SpendKey):
 			raise TypeError('Bad type for spend key!')
 		
 		self.s1 = spend.s1
 		self.s2 = spend.s2
+		self.D = spend.r*params.F
 
 class IncomingViewKey:
 	def __init__(self,full):
@@ -39,15 +42,6 @@ class IncomingViewKey:
 			raise TypeError('Bad type for full view key!')
 		
 		self.s1 = full.s1
-
-class ProofDelegationKey:
-	def __init__(self,params,spend):
-		if not isinstance(params,AddressParameters):
-			raise TypeError('Bad type for parameters!')
-		if not isinstance(spend,SpendKey):
-			raise TypeError('Bad type for spend key!')
-		
-		self.D = spend.r*params.F
 
 class PublicAddress:
 	def __init__(self,params,spend):
@@ -68,9 +62,8 @@ def generate(params):
 	r = random_scalar()
 
 	spend = SpendKey(s1,s2,r)
-	full = FullViewKey(spend)
+	full = FullViewKey(params,spend)
 	incoming = IncomingViewKey(full)
-	delegation = ProofDelegationKey(params,spend)
 	public = PublicAddress(params,spend)
 
-	return spend,full,incoming,delegation,public
+	return spend,full,incoming,public
