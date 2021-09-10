@@ -2,7 +2,7 @@
 #
 # {G,Y ; (y) | Y = yG}
 
-from dumb25519 import Point, Scalar, random_scalar
+from dumb25519 import Point, Scalar, hash_to_scalar, random_scalar
 import transcript
 
 class SchnorrParameters:
@@ -30,6 +30,12 @@ class SchnorrWitness:
 		self.y = y
 
 class SchnorrProof:
+	def __repr__(self):
+		return repr(hash_to_scalar(
+			self.A,
+			self.t
+		))
+
 	def __init__(self,A,t):
 		if not isinstance(A,Point):
 			raise TypeError('Bad type for Schnorr proof element A!')

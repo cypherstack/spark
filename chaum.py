@@ -2,7 +2,7 @@
 #
 # {(G,F,H),Y,Z ; (x,y) | Y = xG + yF, H = xZ}
 
-from dumb25519 import Point, Scalar, random_scalar
+from dumb25519 import Point, Scalar, hash_to_scalar, random_scalar
 import transcript
 
 class ChaumParameters:
@@ -19,7 +19,7 @@ class ChaumParameters:
 		self.H = H
 
 class ChaumStatement:
-	def __init__(self,params,Y,Z):
+	def __init__(self,params,context,Y,Z):
 		if not isinstance(params,ChaumParameters):
 			raise TypeError('Bad type for parameters!')
 		if not isinstance(Y,Point):
@@ -30,6 +30,7 @@ class ChaumStatement:
 		self.G = params.G
 		self.F = params.F
 		self.H = params.H
+		self.context = context
 		self.Y = Y
 		self.Z = Z
 
@@ -44,6 +45,15 @@ class ChaumWitness:
 		self.y = y
 
 class ChaumProof:
+	def __repr__(self):
+		return repr(hash_to_scalar(
+			self.A1,
+			self.A2,
+			self.A3,
+			self.t1,
+			self.t2
+		))
+
 	def __init__(self,A1,A2,A3,t1,t2):
 		if not isinstance(A1,Point):
 			raise TypeError('Bad type for Chaum proof element A1!')
@@ -76,6 +86,7 @@ def challenge(statement,A1,A2,A3):
 	tr.update(statement.G)
 	tr.update(statement.F)
 	tr.update(statement.H)
+	tr.update(statement.context)
 	tr.update(statement.Y)
 	tr.update(statement.Z)
 	tr.update(A1)

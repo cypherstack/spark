@@ -50,6 +50,19 @@ class ParallelCompressedWitness:
 		self.v = v
 
 class ParallelCompressedProof:
+	def __repr__(self):
+		return repr(hash_to_scalar(
+			self.A,
+			self.B,
+			self.C,
+			self.D,
+			self.G,
+			self.f,
+			self.zA,
+			self.zC,
+			self.z
+		))
+
 	def __init__(self,A,B,C,D,G,f,zA,zC,z):
 		if not isinstance(A,Point):
 			raise TypeError('Bad type for parallel proof element A!')

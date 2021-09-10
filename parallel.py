@@ -50,6 +50,21 @@ class ParallelWitness:
 		self.v = v
 
 class ParallelProof:
+	def __repr__(self):
+		return repr(hash_to_scalar(
+			self.A,
+			self.B,
+			self.C,
+			self.D,
+			self.Gs,
+			self.Gv,
+			self.f,
+			self.zA,
+			self.zC,
+			self.zS,
+			self.zV
+		))
+
 	def __init__(self,A,B,C,D,Gs,Gv,f,zA,zC,zS,zV):
 		if not isinstance(A,Point):
 			raise TypeError('Bad type for parallel proof element A!')

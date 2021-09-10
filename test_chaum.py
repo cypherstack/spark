@@ -12,7 +12,7 @@ class TestChaum(unittest.TestCase):
 
 		Y = x*params.G + y*params.F
 		Z = x.invert()*params.H
-		statement = chaum.ChaumStatement(params,Y,Z)
+		statement = chaum.ChaumStatement(params,'Proof context',Y,Z)
 
 		proof = chaum.prove(statement,witness)
 		chaum.verify(statement,proof)

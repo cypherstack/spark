@@ -39,6 +39,16 @@ class CoinDelegation:
 		self.C1 = C1
 
 class Coin:
+	def __repr__(self):
+		return repr(hash_to_scalar(
+			self.K,
+			self.S,
+			self.C,
+			self.range,
+			self.value_enc,
+			self.memo_enc
+		))
+
 	def __init__(self,params,public,value,memo,is_mint,is_output):
 		if not isinstance(params,CoinParameters):
 			raise TypeError('Bad type for parameters!')
