@@ -3,7 +3,7 @@
 # {(G,H,n),C ; (v,r) | 0 <= v < 2^n, C = vH + rG}
 
 import dumb25519
-from dumb25519 import Point, Scalar, ScalarVector, PointVector, random_scalar, hash_to_point, multiexp
+from dumb25519 import Point, Scalar, ScalarVector, PointVector, hash_to_scalar, random_scalar, hash_to_point, multiexp
 import transcript
 from random import randrange
 
@@ -47,6 +47,18 @@ class RangeWitness:
 		self.r = r
 
 class RangeProof:
+	def __repr__(self):
+		return repr(hash_to_scalar(
+			self.A,
+			self.A1,
+			self.B,
+			self.r1,
+			self.s1,
+			self.d1,
+			self.L,
+			self.R
+		))
+
 	def __init__(self,A,A1,B,r1,s1,d1,L,R):
 		if not isinstance(A,Point):
 			raise TypeError('Bad type for range proof element A!')

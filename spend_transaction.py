@@ -70,7 +70,6 @@ class SpendTransaction:
 		# Spends
 		for u in range(w):
 			input = inputs[indexes[u]]
-			K_der = spend.s1*input.K
 
 			# Serial number commitment offset
 			self.S1.append(input.delegation.S1)
@@ -93,12 +92,6 @@ class SpendTransaction:
 				)
 			))
 
-			# Modified Chaum-Pedersen proof
-			self.chaum.append(chaum.prove(
-				chaum.ChaumStatement(chaum.ChaumParameters(params.G,params.F,params.H),self.S1[u],input.T),
-				chaum.ChaumWitness(input.s,spend.r - hash_to_scalar('ser1',input.delegation.id,input.s,full.s1,full.s2))
-			))
-		
 		# Balance statement input value
 		b_st = dumb25519.Z
 		for u in range(w):
@@ -121,6 +114,26 @@ class SpendTransaction:
 			schnorr.SchnorrWitness(b_w)
 		)
 
+		# Modified Chaum-Pedersen proofs
+		mu = hash_to_scalar(
+			self.inputs,
+			self.outputs,
+			self.fee,
+			self.S1,
+			self.C1,
+			self.T,
+			self.parallel,
+			self.balance
+		)
+
+		for u in range(w):
+			input = inputs[indexes[u]]
+			self.chaum.append(chaum.prove(
+				chaum.ChaumStatement(chaum.ChaumParameters(params.G,params.F,params.H),mu,self.S1[u],input.T),
+				chaum.ChaumWitness(input.s,spend.r - hash_to_scalar('ser1',input.delegation.id,input.s,full.s1,full.s2))
+			))
+		
+
 	def verify(self,params,tags=None):
 		if not isinstance(params,ProtocolParameters):
 			raise TypeError('Bad type for parameters!')
@@ -137,6 +150,17 @@ class SpendTransaction:
 		w = len(self.T)
 		t = len(self.outputs)
 
+		mu = hash_to_scalar(
+			self.inputs,
+			self.outputs,
+			self.fee,
+			self.S1,
+			self.C1,
+			self.T,
+			self.parallel,
+			self.balance
+		)
+
 		# Check input proofs
 		for u in range(w):
 			parallel.verify(
@@ -149,7 +173,7 @@ class SpendTransaction:
 			)
 
 			chaum.verify(
-				chaum.ChaumStatement(chaum.ChaumParameters(params.G,params.F,params.H),self.S1[u],self.T[u]),
+				chaum.ChaumStatement(chaum.ChaumParameters(params.G,params.F,params.H),mu,self.S1[u],self.T[u]),
 				self.chaum[u]
 			)
 		
