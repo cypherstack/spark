@@ -1,6 +1,6 @@
 # Spark
 
-This is a research implementation of the Spark transaction protocol.
+This is a research implementation of the [Spark](https://eprint.iacr.org/2021/1173) transaction protocol.
 Its purpose is to demonstrate algorithms and make it easy to iterate on features and ideas.
 
 **This code is experimental and not intended for use in production.**
