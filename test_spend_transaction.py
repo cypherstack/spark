@@ -27,7 +27,9 @@ class TestSpend(unittest.TestCase):
 		coin_params = coin.CoinParameters(protocol_params.G,protocol_params.F,protocol_params.H,protocol_params.N)
 
 		# Address
-		spend,full,_,public = address.generate(address_params)
+		spend = address.SpendKey()
+		full = address.FullViewKey(address_params,spend)
+		public = address.PublicAddress(address_params,spend)
 
 		# Generate the input set and real coins
 		inputs = []

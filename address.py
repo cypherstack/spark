@@ -1,6 +1,6 @@
 # Address generation
 
-from dumb25519 import Point, Scalar, random_scalar
+from dumb25519 import Point, random_scalar
 
 class AddressParameters:
 	def __init__(self,G,F):
@@ -13,17 +13,10 @@ class AddressParameters:
 		self.F = F
 
 class SpendKey:
-	def __init__(self,s1,s2,r):
-		if not isinstance(s1,Scalar):
-			raise TypeError('Bad type for spend key s1!')
-		if not isinstance(s2,Scalar):
-			raise TypeError('Bad type for spend key s2!')
-		if not isinstance(r,Scalar):
-			raise TypeError('Bad type for spend key r!')
-		
-		self.s1 = s1
-		self.s2 = s2
-		self.r = r
+	def __init__(self):
+		self.s1 = random_scalar()
+		self.s2 = random_scalar()
+		self.r = random_scalar()
 
 class FullViewKey:
 	def __init__(self,params,spend):
@@ -52,18 +45,3 @@ class PublicAddress:
 
 		self.Q1 = spend.s1*params.G
 		self.Q2 = spend.s2*params.G + spend.r*params.F
-
-def generate(params):
-	if not isinstance(params,AddressParameters):
-		raise TypeError('Bad type for parameters!')
-
-	s1 = random_scalar()
-	s2 = random_scalar()
-	r = random_scalar()
-
-	spend = SpendKey(s1,s2,r)
-	full = FullViewKey(params,spend)
-	incoming = IncomingViewKey(full)
-	public = PublicAddress(params,spend)
-
-	return spend,full,incoming,public
