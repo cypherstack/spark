@@ -40,14 +40,23 @@ class CoinDelegation:
 
 class Coin:
 	def __repr__(self):
-		return repr(hash_to_scalar(
-			self.K,
-			self.S,
-			self.C,
-			self.range,
-			self.value_enc,
-			self.memo_enc
-		))
+		if self.is_mint:
+			return repr(hash_to_scalar(
+				self.K,
+				self.S,
+				self.C,
+				self.value,
+				self.memo_enc
+			))
+		else:
+			return repr(hash_to_scalar(
+				self.K,
+				self.S,
+				self.C,
+				self.range,
+				self.value_enc,
+				self.memo_enc
+			))
 
 	def __init__(self,params,public,value,memo,is_mint,is_output):
 		if not isinstance(params,CoinParameters):

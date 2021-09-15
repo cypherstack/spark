@@ -10,7 +10,7 @@ class TestPay(unittest.TestCase):
 		coin_params = coin.CoinParameters(address_params.G,address_params.F,random_point(),4)
 		pay_params = pay.PayParameters(address_params.G,address_params.F)
 
-		_,_,_,public = address.generate(address_params)
+		public = address.PublicAddress(address_params,address.SpendKey())
 		coin_ = coin.Coin(coin_params,public,1,'Test memo',False,True)
 
 		witness = pay.PayWitness(coin_.k)

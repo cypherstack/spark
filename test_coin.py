@@ -10,7 +10,10 @@ class TestCoin(unittest.TestCase):
 		coin_params = coin.CoinParameters(address_params.G,address_params.F,random_point(),4)
 
 		# Address
-		spend,full,incoming,public = address.generate(address_params)
+		spend = address.SpendKey()
+		full = address.FullViewKey(address_params,spend)
+		incoming = address.IncomingViewKey(full)
+		public = address.PublicAddress(address_params,spend)
 
 		# Coin data
 		value = randrange(0,2**coin_params.N)
