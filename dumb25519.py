@@ -4,7 +4,7 @@
 # -- putting this code into production would be dumb
 # -- assuming this code is secure would also be dumb
 
-import random
+import secrets
 from hashlib import blake2s
 
 # Curve parameters
@@ -528,13 +528,14 @@ def hash_to_scalar(*data):
 
 # Generate a random Scalar
 def random_scalar(zero=True):
-	if zero:
-		return Scalar(random.randrange(0,l))
-	return Scalar(random.randrange(1,l))
+	value = Scalar(secrets.randbelow(l))
+	if not zero and value == Scalar(0):
+		raise ValueError('Random scalar unexpectedly returned zero!')
+	return value
 
 # Generate a random Point in the main subgroup
 def random_point():
-	return hash_to_point(str(random.random()))
+	return hash_to_point(secrets.randbits(b))
 
 # The main subgroup default generator
 Gy = 4*invert(5,q)
@@ -555,7 +556,6 @@ def multiexp(scalars,points):
 		return Z
 
 	buckets = None
-	nonzero = False
 	result = Z # zero point
    
 	c = 4 # window parameter; NOTE: the optimal value actually depends on len(points) empirically

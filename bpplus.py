@@ -5,7 +5,6 @@
 import dumb25519
 from dumb25519 import Point, Scalar, ScalarVector, PointVector, hash_to_scalar, random_scalar, hash_to_point, multiexp
 import transcript
-from random import randrange
 
 class RangeParameters:
 	def __init__(self,G,H,N):
