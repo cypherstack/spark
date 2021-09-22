@@ -1,22 +1,22 @@
 # Bulletproof+ range proof
 #
-# {(G,H,n),C ; (v,r) | 0 <= v < 2^n, C = vH + rG}
+# {(H,G,n),C ; (v,r) | 0 <= v < 2^n, C = vH + rG}
 
 import dumb25519
 from dumb25519 import Point, Scalar, ScalarVector, PointVector, hash_to_scalar, random_scalar, hash_to_point, multiexp
 import transcript
 
 class RangeParameters:
-	def __init__(self,G,H,N):
-		if not isinstance(G,Point):
-			raise TypeError('Bad type for parameter G!')
+	def __init__(self,H,G,N):
 		if not isinstance(H,Point):
 			raise TypeError('Bad type for parameter H!')
+		if not isinstance(G,Point):
+			raise TypeError('Bad type for parameter G!')
 		if not isinstance(N,int) or N < 1:
 			raise ValueError('Bad type or value for parameter N!')
 		
-		self.G = G
 		self.H = H
+		self.G = G
 		self.N = N
 
 class RangeStatement:

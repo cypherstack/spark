@@ -22,9 +22,9 @@ class TestSpend(unittest.TestCase):
 		self.assertGreaterEqual(n**m,w)
 		self.assertGreaterEqual(t,1)
 
-		protocol_params = spend_transaction.ProtocolParameters(random_point(),random_point(),random_point(),N,n,m)
-		address_params = address.AddressParameters(protocol_params.G,protocol_params.F)
-		coin_params = coin.CoinParameters(protocol_params.G,protocol_params.F,protocol_params.H,protocol_params.N)
+		protocol_params = spend_transaction.ProtocolParameters(random_point(),random_point(),random_point(),random_point(),N,n,m)
+		address_params = address.AddressParameters(protocol_params.F,protocol_params.G)
+		coin_params = coin.CoinParameters(protocol_params.F,protocol_params.G,protocol_params.H,protocol_params.U,protocol_params.N)
 
 		# Address
 		spend = address.SpendKey()

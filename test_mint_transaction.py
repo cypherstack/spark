@@ -6,8 +6,8 @@ import unittest
 
 class TestMint(unittest.TestCase):
 	def test_mint(self):
-		protocol_params = mint_transaction.ProtocolParameters(random_point(),random_point(),random_point(),4)
-		address_params = address.AddressParameters(protocol_params.G,protocol_params.F)
+		protocol_params = mint_transaction.ProtocolParameters(random_point(),random_point(),random_point(),random_point(),4)
+		address_params = address.AddressParameters(protocol_params.F,protocol_params.G)
 
 		# Mint data
 		public = address.PublicAddress(address_params,address.SpendKey())

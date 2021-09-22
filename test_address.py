@@ -13,9 +13,9 @@ class TestAddress(unittest.TestCase):
 		self.assertEqual(incoming.s1,spend.s1)
 		self.assertEqual(full.s1,spend.s1)
 		self.assertEqual(full.s2,spend.s2)
-		self.assertEqual(full.D,spend.r*params.F)
-		self.assertEqual(public.Q1,spend.s1*params.G)
-		self.assertEqual(public.Q2,spend.s2*params.G + spend.r*params.F)
+		self.assertEqual(full.D,spend.r*params.G)
+		self.assertEqual(public.Q1,spend.s1*params.F)
+		self.assertEqual(public.Q2,spend.s2*params.F + spend.r*params.G)
 
 if __name__ == '__main__':
 	unittest.main()
