@@ -7,7 +7,7 @@ import unittest
 class TestCoin(unittest.TestCase):
 	def test_generate(self):
 		address_params = address.AddressParameters(random_point(),random_point())
-		coin_params = coin.CoinParameters(address_params.G,address_params.F,random_point(),4)
+		coin_params = coin.CoinParameters(address_params.F,address_params.G,random_point(),random_point(),4)
 
 		# Address
 		spend = address.SpendKey()
@@ -34,8 +34,8 @@ class TestCoin(unittest.TestCase):
 			self.assertEqual(coin_.memo,memo)
 
 			# Serial number and tag correctness
-			self.assertEqual(coin_.s*coin_params.G + spend.r*coin_params.F,coin_.S)
-			self.assertEqual(coin_.s*coin_.T,coin_params.H)
+			self.assertEqual(coin_.s*coin_params.F + spend.r*coin_params.G,coin_.S)
+			self.assertEqual(coin_.s*coin_.T + spend.r*coin_params.G,coin_params.U)
 
 if __name__ == '__main__':
 	unittest.main()

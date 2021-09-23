@@ -10,13 +10,15 @@ import parallel
 import schnorr
 
 class ProtocolParameters:
-	def __init__(self,G,F,H,N,n,m):
-		if not isinstance(G,Point):
-			raise TypeError('Bad type for parameter G!')
+	def __init__(self,F,G,H,U,N,n,m):
 		if not isinstance(F,Point):
 			raise TypeError('Bad type for parameter F!')
+		if not isinstance(G,Point):
+			raise TypeError('Bad type for parameter G!')
 		if not isinstance(H,Point):
 			raise TypeError('Bad type for parameter H!')
+		if not isinstance(U,Point):
+			raise TypeError('Bad type for parameter U!')
 		if not isinstance(N,int) or N < 1:
 			raise ValueError('Bad type or value for parameter N!')
 		if not isinstance(n,int) or n < 1:
@@ -24,9 +26,10 @@ class ProtocolParameters:
 		if not isinstance(m,int) or m < 1:
 			raise ValueError('Bad type or value for parameter m!')
 		
-		self.G = G
 		self.F = F
+		self.G = G
 		self.H = H
+		self.U = U
 		self.N = N
 		self.n = n
 		self.m = m
@@ -81,7 +84,7 @@ class SpendTransaction:
 			# Parallel one-of-many proof
 			self.parallel.append(parallel.prove(
 				parallel.ParallelStatement(
-					parallel.ParallelParameters(params.F,params.n,params.m),
+					parallel.ParallelParameters(params.H,params.n,params.m),
 					PointVector([input.S - self.S1[u] for input in inputs]),
 					PointVector([input.C - self.C1[u] for input in inputs])
 				),
@@ -110,7 +113,7 @@ class SpendTransaction:
 
 		# Balance proof
 		self.balance = schnorr.prove(
-			schnorr.SchnorrStatement(schnorr.SchnorrParameters(params.F),b_st),
+			schnorr.SchnorrStatement(schnorr.SchnorrParameters(params.H),b_st),
 			schnorr.SchnorrWitness(b_w)
 		)
 
@@ -129,8 +132,8 @@ class SpendTransaction:
 		for u in range(w):
 			input = inputs[indexes[u]]
 			self.chaum.append(chaum.prove(
-				chaum.ChaumStatement(chaum.ChaumParameters(params.G,params.F,params.H),mu,self.S1[u],input.T),
-				chaum.ChaumWitness(input.s,spend.r - hash_to_scalar('ser1',input.delegation.id,input.s,full.s1,full.s2))
+				chaum.ChaumStatement(chaum.ChaumParameters(params.F,params.G,params.H,params.U),mu,self.S1[u],input.T),
+				chaum.ChaumWitness(input.s,spend.r,Scalar(0) - hash_to_scalar('ser1',input.delegation.id,input.s,full.s1,full.s2))
 			))
 		
 
@@ -165,7 +168,7 @@ class SpendTransaction:
 		for u in range(w):
 			parallel.verify(
 				parallel.ParallelStatement(
-					parallel.ParallelParameters(params.F,params.n,params.m),
+					parallel.ParallelParameters(params.H,params.n,params.m),
 					PointVector([input.S - self.S1[u] for input in self.inputs]),
 					PointVector([input.C - self.C1[u] for input in self.inputs])
 				),
@@ -173,14 +176,14 @@ class SpendTransaction:
 			)
 
 			chaum.verify(
-				chaum.ChaumStatement(chaum.ChaumParameters(params.G,params.F,params.H),mu,self.S1[u],self.T[u]),
+				chaum.ChaumStatement(chaum.ChaumParameters(params.F,params.G,params.H,params.U),mu,self.S1[u],self.T[u]),
 				self.chaum[u]
 			)
 		
 		# Check output proofs
 		for j in range(t):
 			bpplus.verify(
-				[bpplus.RangeStatement(bpplus.RangeParameters(params.F,params.G,params.N),PointVector([self.outputs[j].C]))],
+				[bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,params.N),PointVector([self.outputs[j].C]))],
 				[self.outputs[j].range]
 			)
 
@@ -193,6 +196,6 @@ class SpendTransaction:
 		b_st -= Scalar(self.fee)*params.G
 
 		schnorr.verify(
-			schnorr.SchnorrStatement(schnorr.SchnorrParameters(params.F),b_st),
+			schnorr.SchnorrStatement(schnorr.SchnorrParameters(params.H),b_st),
 			self.balance
 		)

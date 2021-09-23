@@ -1,10 +1,10 @@
 # Payment proving system
 #
-# {(G,F),S,C,K_rec,K_der,Q_1,Q_2,v' ; k | 
-#		K_rec = kG,
+# {(F,G,H),S,C,K_rec,K_der,Q_1,Q_2,v' ; k | 
+#		K_rec = kF,
 #		k_der = kQ_1,
-#		S = H_ser(K_der,Q_1,Q_2)G + Q_2,
-#		C = SymDec(K_der,v')G + H_val(K_der)
+#		S = H_ser(K_der,Q_1,Q_2)F + Q_2,
+#		C = SymDec(K_der,v')G + H_val(K_der)H
 # }
 
 import address
@@ -14,14 +14,17 @@ import transcript
 import util
 
 class PayParameters:
-	def __init__(self,G,F):
-		if not isinstance(G,Point):
-			raise TypeError('Bad type for parameter G!')
+	def __init__(self,F,G,H):
 		if not isinstance(F,Point):
 			raise TypeError('Bad type for parameter F!')
+		if not isinstance(G,Point):
+			raise TypeError('Bad type for parameter G!')
+		if not isinstance(H,Point):
+			raise TypeError('Bad type for parameter H!')
 		
-		self.G = G
 		self.F = F
+		self.G = G
+		self.H = H
 
 class PayStatement:
 	def __init__(self,params,context,coin_,K_der,public):
@@ -34,8 +37,9 @@ class PayStatement:
 		if not isinstance(public,address.PublicAddress):
 			raise TypeError('Bad type for pay statement public address!')
 		
-		self.G = params.G
 		self.F = params.F
+		self.G = params.G
+		self.H = params.H
 		self.context = context
 		self.coin = coin_
 		self.K_der = K_der
@@ -70,8 +74,9 @@ def challenge(statement,A1,A2):
 		raise TypeError('Bad type for challenge input A2!')
 
 	tr = transcript.Transcript('Pay proof')
-	tr.update(statement.G)
 	tr.update(statement.F)
+	tr.update(statement.G)
+	tr.update(statement.H)
 	tr.update(statement.context)
 	tr.update(statement.coin.S)
 	tr.update(statement.coin.C)
@@ -92,23 +97,23 @@ def prove(statement,witness):
 		raise TypeError('Bad type for pay witness!')
 	
 	# Check the statement validity
-	if not statement.coin.K == witness.k*statement.G:
+	if not statement.coin.K == witness.k*statement.F:
 		raise ArithmeticError('Invalid pay statement!')
 	if not statement.K_der == witness.k*statement.public.Q1:
 		raise ArithmeticError('Invalid pay statement!')
-	if not statement.coin.S == hash_to_scalar('ser',statement.K_der,statement.public.Q1,statement.public.Q2)*statement.G + statement.public.Q2:
+	if not statement.coin.S == hash_to_scalar('ser',statement.K_der,statement.public.Q1,statement.public.Q2)*statement.F + statement.public.Q2:
 		raise ArithmeticError('Invalid pay statement!')
 
 	# Decrypt value and memo
 	value = Scalar(util.aead_decrypt_utf8(statement.K_der,'Spark coin value',statement.coin.value_enc))
 	util.aead_decrypt_utf8(statement.K_der,'Spark coin memo',statement.coin.memo_enc)
 
-	if not statement.coin.C == value*statement.G + hash_to_scalar('val',statement.K_der)*statement.F:
+	if not statement.coin.C == value*statement.G + hash_to_scalar('val',statement.K_der)*statement.H:
 		raise ArithmeticError('Invalid pay statement!')
 	
 	r = random_scalar()
 
-	A1 = r*statement.G
+	A1 = r*statement.F
 	A2 = r*statement.public.Q1
 
 	c = challenge(statement,A1,A2)
@@ -125,16 +130,16 @@ def verify(statement,proof):
 	
 	c = challenge(statement,proof.A1,proof.A2)
 
-	if not proof.A1 + c*statement.coin.K == proof.t*statement.G:
+	if not proof.A1 + c*statement.coin.K == proof.t*statement.F:
 		raise ArithmeticError('Failed pay verification!')
 	if not proof.A2 + c*statement.K_der == proof.t*statement.public.Q1:
 		raise ArithmeticError('Failed pay verification!')
-	if not statement.coin.S == hash_to_scalar('ser',statement.K_der,statement.public.Q1,statement.public.Q2)*statement.G + statement.public.Q2:
+	if not statement.coin.S == hash_to_scalar('ser',statement.K_der,statement.public.Q1,statement.public.Q2)*statement.F + statement.public.Q2:
 		raise ArithmeticError('Failed pay verification!')
 
 	# Decrypt value and memo
 	value = Scalar(util.aead_decrypt_utf8(statement.K_der,'Spark coin value',statement.coin.value_enc))
 	util.aead_decrypt_utf8(statement.K_der,'Spark coin memo',statement.coin.memo_enc)
 
-	if not statement.coin.C == value*statement.G + hash_to_scalar('val',statement.K_der)*statement.F:
+	if not statement.coin.C == value*statement.G + hash_to_scalar('val',statement.K_der)*statement.H:
 		raise ArithmeticError('Failed pay verification!')

@@ -3,14 +3,14 @@
 from dumb25519 import Point, random_scalar
 
 class AddressParameters:
-	def __init__(self,G,F):
-		if not isinstance(G,Point):
-			raise TypeError('Bad type for parameter G!')
+	def __init__(self,F,G):
 		if not isinstance(F,Point):
+			raise TypeError('Bad type for parameter G!')
+		if not isinstance(G,Point):
 			raise TypeError('Bad type for parameter F!')
 		
-		self.G = G
 		self.F = F
+		self.G = G
 
 class SpendKey:
 	def __init__(self):
@@ -27,7 +27,7 @@ class FullViewKey:
 		
 		self.s1 = spend.s1
 		self.s2 = spend.s2
-		self.D = spend.r*params.F
+		self.D = spend.r*params.G
 
 class IncomingViewKey:
 	def __init__(self,full):
@@ -43,5 +43,5 @@ class PublicAddress:
 		if not isinstance(spend,SpendKey):
 			raise TypeError('Bad type for spend key!')
 
-		self.Q1 = spend.s1*params.G
-		self.Q2 = spend.s2*params.G + spend.r*params.F
+		self.Q1 = spend.s1*params.F
+		self.Q2 = spend.s2*params.F + spend.r*params.G

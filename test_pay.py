@@ -7,8 +7,8 @@ import unittest
 class TestPay(unittest.TestCase):
 	def test_complete(self):
 		address_params = address.AddressParameters(random_point(),random_point())
-		coin_params = coin.CoinParameters(address_params.G,address_params.F,random_point(),4)
-		pay_params = pay.PayParameters(address_params.G,address_params.F)
+		coin_params = coin.CoinParameters(address_params.F,address_params.G,random_point(),random_point(),4)
+		pay_params = pay.PayParameters(address_params.F,address_params.G,coin_params.H)
 
 		public = address.PublicAddress(address_params,address.SpendKey())
 		coin_ = coin.Coin(coin_params,public,1,'Test memo',False,True)

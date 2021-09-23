@@ -6,19 +6,22 @@ import bpplus
 import util
 
 class CoinParameters:
-	def __init__(self,G,F,H,N):
-		if not isinstance(G,Point):
-			raise TypeError('Bad type for parameter G!')
+	def __init__(self,F,G,H,U,N):
 		if not isinstance(F,Point):
 			raise TypeError('Bad type for parameter F!')
+		if not isinstance(G,Point):
+			raise TypeError('Bad type for parameter G!')
 		if not isinstance(H,Point):
 			raise TypeError('Bad type for parameter H!')
+		if not isinstance(U,Point):
+			raise TypeError('Bad type for parameter U!')
 		if not isinstance(N,int) or N < 1:
 			raise ValueError('Bad type or value for parameter N!')
 		
-		self.G = G
 		self.F = F
+		self.G = G
 		self.H = H
+		self.U = U
 		self.N = N
 
 class CoinDelegation:
@@ -74,17 +77,17 @@ class Coin:
 
 		# Recovery key
 		k = random_scalar()
-		self.K = k*params.G
+		self.K = k*params.F
 		K_der = k*public.Q1
 
 		# Serial number commitment
-		self.S = hash_to_scalar('ser',K_der,public.Q1,public.Q2)*params.G + public.Q2
+		self.S = hash_to_scalar('ser',K_der,public.Q1,public.Q2)*params.F + public.Q2
 
 		# Value commitment
-		self.C = Scalar(value)*params.G + hash_to_scalar('val',K_der)*params.F
+		self.C = Scalar(value)*params.G + hash_to_scalar('val',K_der)*params.H
 		if not is_mint:
 			self.range = bpplus.prove(
-				bpplus.RangeStatement(bpplus.RangeParameters(params.F,params.G,params.N),PointVector([self.C])),
+				bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,params.N),PointVector([self.C])),
 				bpplus.RangeWitness(ScalarVector([Scalar(value)]),ScalarVector([hash_to_scalar('val',K_der)]))
 			)
 
@@ -117,7 +120,7 @@ class Coin:
 		K_der = incoming.s1*self.K
 		
 		# Test for ownership
-		if not self.S == hash_to_scalar('ser',K_der,public.Q1,public.Q2)*params.G + public.Q2:
+		if not self.S == hash_to_scalar('ser',K_der,public.Q1,public.Q2)*params.F + public.Q2:
 			raise ArithmeticError('Coin does not belong to this public address!')
 		
 		# Decrypt value and memo
@@ -126,13 +129,13 @@ class Coin:
 		self.memo = util.aead_decrypt_utf8(K_der,'Spark coin memo',self.memo_enc)
 		
 		# Test for value commitment
-		if not self.C == self.value*params.G + hash_to_scalar('val',K_der)*params.F:
+		if not self.C == self.value*params.G + hash_to_scalar('val',K_der)*params.H:
 			raise ArithmeticError('Bad coin value commitment!')
 		
 		# Test range proof
 		if not self.is_mint:
 			bpplus.verify(
-				[bpplus.RangeStatement(bpplus.RangeParameters(params.F,params.G,params.N),PointVector([self.C]))],
+				[bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,params.N),PointVector([self.C]))],
 				[self.range]
 			)
 		
@@ -147,7 +150,7 @@ class Coin:
 		K_der = full.s1*self.K
 		
 		# Test for ownership
-		if not self.S == hash_to_scalar('ser',K_der,public.Q1,public.Q2)*params.G + public.Q2:
+		if not self.S == hash_to_scalar('ser',K_der,public.Q1,public.Q2)*params.F + public.Q2:
 			raise ArithmeticError('Coin does not belong to this public address!')
 		
 		# Decrypt value and memo
@@ -156,19 +159,19 @@ class Coin:
 		self.memo = util.aead_decrypt_utf8(K_der,'Spark coin memo',self.memo_enc)
 		
 		# Test for value commitment
-		if not self.C == self.value*params.G + hash_to_scalar('val',K_der)*params.F:
+		if not self.C == self.value*params.G + hash_to_scalar('val',K_der)*params.H:
 			raise ArithmeticError('Bad coin value commitment!')
 		
 		# Test range proof
 		if not self.is_mint:
 			bpplus.verify(
-				[bpplus.RangeStatement(bpplus.RangeParameters(params.F,params.G,params.N),PointVector([self.C]))],
+				[bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,params.N),PointVector([self.C]))],
 				[self.range]
 			)
 		
 		# Recover serial number and generate tag
 		self.s = hash_to_scalar('ser',K_der,public.Q1,public.Q2) + full.s2
-		self.T = self.s.invert()*params.H
+		self.T = self.s.invert()*(params.U - full.D)
 
 		self.recovered = True
 	
@@ -181,8 +184,8 @@ class Coin:
 			raise ValueError('Delegation requires coin recovery!')
 		
 		s1 = hash_to_scalar('ser1',id,self.s,full.s1,full.s2)
-		S1 = self.s*params.G - hash_to_scalar('ser1',id,self.s,full.s1,full.s2)*params.F + full.D
+		S1 = self.s*params.F - hash_to_scalar('ser1',id,self.s,full.s1,full.s2)*params.H + full.D
 		c1 = hash_to_scalar('val',full.s1*self.K) - hash_to_scalar('val1',id,self.s,full.s1,full.s2)
-		C1 = self.value*params.G + hash_to_scalar('val1',id,self.s,full.s1,full.s2)*params.F
+		C1 = self.value*params.G + hash_to_scalar('val1',id,self.s,full.s1,full.s2)*params.H
 
 		self.delegation = CoinDelegation(id,s1,S1,c1,C1)

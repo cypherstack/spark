@@ -10,19 +10,22 @@ import parallel
 import schnorr
 
 class ProtocolParameters:
-	def __init__(self,G,F,H,N):
-		if not isinstance(G,Point):
-			raise TypeError('Bad type for parameter G!')
+	def __init__(self,F,G,H,U,N):
 		if not isinstance(F,Point):
 			raise TypeError('Bad type for parameter F!')
+		if not isinstance(G,Point):
+			raise TypeError('Bad type for parameter G!')
 		if not isinstance(H,Point):
+			raise TypeError('Bad type for parameter H!')
+		if not isinstance(U,Point):
 			raise TypeError('Bad type for parameter H!')
 		if not isinstance(N,int) or N < 1:
 			raise ValueError('Bad type or value for parameter N!')
 		
-		self.G = G
 		self.F = F
+		self.G = G
 		self.H = H
+		self.U = U
 		self.N = N
 
 class MintTransaction:
@@ -35,7 +38,7 @@ class MintTransaction:
 			raise ValueError('Bad type or value for coin value!')
 
 		self.output = coin.Coin(
-			coin.CoinParameters(params.G,params.F,params.H,params.N),
+			coin.CoinParameters(params.F,params.G,params.H,params.U,params.N),
 			public,
 			value,
 			memo,
@@ -46,7 +49,7 @@ class MintTransaction:
 
 		self.balance = schnorr.prove(
 			schnorr.SchnorrStatement(
-				schnorr.SchnorrParameters(params.F),
+				schnorr.SchnorrParameters(params.H),
 				self.output.C - Scalar(self.value)*params.G
 			),
 			schnorr.SchnorrWitness(hash_to_scalar('val',self.output.k*self.output.Q1))
@@ -63,7 +66,7 @@ class MintTransaction:
 		# Check balance
 		schnorr.verify(
 			schnorr.SchnorrStatement(
-				schnorr.SchnorrParameters(params.F),
+				schnorr.SchnorrParameters(params.H),
 				self.output.C - Scalar(self.value)*params.G
 			),
 			self.balance
