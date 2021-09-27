@@ -14,17 +14,20 @@ import transcript
 import util
 
 class PayParameters:
-	def __init__(self,F,G,H):
+	def __init__(self,F,G,H,value_bytes):
 		if not isinstance(F,Point):
 			raise TypeError('Bad type for parameter F!')
 		if not isinstance(G,Point):
 			raise TypeError('Bad type for parameter G!')
 		if not isinstance(H,Point):
 			raise TypeError('Bad type for parameter H!')
+		if not isinstance(value_bytes,int) or value_bytes < 1:
+			raise ValueError('Bad type or value for parameter value_bytes!')
 		
 		self.F = F
 		self.G = G
 		self.H = H
+		self.value_bytes = value_bytes
 
 class PayStatement:
 	def __init__(self,params,context,coin_,K_der,public):
@@ -40,6 +43,7 @@ class PayStatement:
 		self.F = params.F
 		self.G = params.G
 		self.H = params.H
+		self.value_bytes = params.value_bytes
 		self.context = context
 		self.coin = coin_
 		self.K_der = K_der
@@ -77,12 +81,12 @@ def challenge(statement,A1,A2):
 	tr.update(statement.F)
 	tr.update(statement.G)
 	tr.update(statement.H)
+	tr.update(statement.value_bytes)
 	tr.update(statement.context)
 	tr.update(statement.coin.S)
 	tr.update(statement.coin.C)
 	tr.update(statement.coin.K)
-	tr.update(statement.coin.value_enc)
-	tr.update(statement.coin.memo_enc)
+	tr.update(statement.coin.enc)
 	tr.update(statement.K_der)
 	tr.update(statement.public.Q1)
 	tr.update(statement.public.Q2)
@@ -104,11 +108,14 @@ def prove(statement,witness):
 	if not statement.coin.S == hash_to_scalar('ser',statement.K_der,statement.public.Q1,statement.public.Q2)*statement.F + statement.public.Q2:
 		raise ArithmeticError('Invalid pay statement!')
 
-	# Decrypt value and memo
-	value = Scalar(util.aead_decrypt_utf8(statement.K_der,'Spark coin value',statement.coin.value_enc))
-	util.aead_decrypt_utf8(statement.K_der,'Spark coin memo',statement.coin.memo_enc)
-
-	if not statement.coin.C == value*statement.G + hash_to_scalar('val',statement.K_der)*statement.H:
+	# Decrypt recipient data
+	data_bytes = util.aead_decrypt(statement.K_der,'Spend recipient data',statement.coin.enc)
+	if data_bytes is not None:
+		value = int.from_bytes(data_bytes[:statement.value_bytes],'little')
+	else:
+		raise ArithmeticError('Bad recipient data!')
+	
+	if not statement.coin.C == Scalar(value)*statement.G + hash_to_scalar('val',statement.K_der)*statement.H:
 		raise ArithmeticError('Invalid pay statement!')
 	
 	r = random_scalar()
@@ -137,9 +144,12 @@ def verify(statement,proof):
 	if not statement.coin.S == hash_to_scalar('ser',statement.K_der,statement.public.Q1,statement.public.Q2)*statement.F + statement.public.Q2:
 		raise ArithmeticError('Failed pay verification!')
 
-	# Decrypt value and memo
-	value = Scalar(util.aead_decrypt_utf8(statement.K_der,'Spark coin value',statement.coin.value_enc))
-	util.aead_decrypt_utf8(statement.K_der,'Spark coin memo',statement.coin.memo_enc)
+	# Decrypt recipient data
+	data_bytes = util.aead_decrypt(statement.K_der,'Spend recipient data',statement.coin.enc)
+	if data_bytes is not None:
+		value = int.from_bytes(data_bytes[:statement.value_bytes],'little')
+	else:
+		raise ArithmeticError('Bad recipient data!')
 
-	if not statement.coin.C == value*statement.G + hash_to_scalar('val',statement.K_der)*statement.H:
+	if not statement.coin.C == Scalar(value)*statement.G + hash_to_scalar('val',statement.K_der)*statement.H:
 		raise ArithmeticError('Failed pay verification!')

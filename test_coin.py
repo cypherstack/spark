@@ -6,8 +6,10 @@ import unittest
 
 class TestCoin(unittest.TestCase):
 	def test_generate(self):
+		value_bytes = 4
+		memo_bytes = 16
 		address_params = address.AddressParameters(random_point(),random_point())
-		coin_params = coin.CoinParameters(address_params.F,address_params.G,random_point(),random_point(),4)
+		coin_params = coin.CoinParameters(address_params.F,address_params.G,random_point(),random_point(),value_bytes,memo_bytes)
 
 		# Address
 		spend = address.SpendKey()
@@ -16,7 +18,7 @@ class TestCoin(unittest.TestCase):
 		public = address.PublicAddress(address_params,spend)
 
 		# Coin data
-		value = randrange(0,2**coin_params.N)
+		value = randrange(0,2**(8*coin_params.value_bytes))
 		memo = 'Test memo'
 
 		for is_mint in [True,False]:

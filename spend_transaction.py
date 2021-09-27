@@ -10,7 +10,7 @@ import parallel
 import schnorr
 
 class ProtocolParameters:
-	def __init__(self,F,G,H,U,N,n,m):
+	def __init__(self,F,G,H,U,value_bytes,memo_bytes,n,m):
 		if not isinstance(F,Point):
 			raise TypeError('Bad type for parameter F!')
 		if not isinstance(G,Point):
@@ -19,8 +19,10 @@ class ProtocolParameters:
 			raise TypeError('Bad type for parameter H!')
 		if not isinstance(U,Point):
 			raise TypeError('Bad type for parameter U!')
-		if not isinstance(N,int) or N < 1:
-			raise ValueError('Bad type or value for parameter N!')
+		if not isinstance(value_bytes,int) or value_bytes < 1:
+			raise ValueError('Bad type or value for parameter value_bytes!')
+		if not isinstance(memo_bytes,int) or memo_bytes < 1:
+			raise ValueError('Bad type or value for parameter value_bytes!')
 		if not isinstance(n,int) or n < 1:
 			raise ValueError('Bad type or value for parameter n!')
 		if not isinstance(m,int) or m < 1:
@@ -30,7 +32,8 @@ class ProtocolParameters:
 		self.G = G
 		self.H = H
 		self.U = U
-		self.N = N
+		self.value_bytes = value_bytes
+		self.memo_bytes = memo_bytes
 		self.n = n
 		self.m = m
 
@@ -50,7 +53,7 @@ class SpendTransaction:
 				raise ValueError('Bad type or value for spend index!')
 			if not inputs[l].recovered:
 				raise ValueError('Input coin is not recovered!')
-		if not isinstance(fee,int) or fee < 0 or fee >= 2**params.N:
+		if not isinstance(fee,int) or fee < 0 or fee.bit_length() > params.value_bytes:
 			raise ValueError('Bad type or value for fee!')
 		for output in outputs:
 			if not isinstance(output,coin.Coin):
@@ -147,7 +150,7 @@ class SpendTransaction:
 				raise ValueError('Tag has been seen before!')
 
 		# Check fee
-		if self.fee < 0 or self.fee >= 2**params.N:
+		if self.fee < 0 or self.fee.bit_length() > params.value_bytes:
 			raise ValueError('Bad value for transaction fee!')
 		
 		w = len(self.T)
@@ -183,7 +186,7 @@ class SpendTransaction:
 		# Check output proofs
 		for j in range(t):
 			bpplus.verify(
-				[bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,params.N),PointVector([self.outputs[j].C]))],
+				[bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,8*params.value_bytes),PointVector([self.outputs[j].C]))],
 				[self.outputs[j].range]
 			)
 

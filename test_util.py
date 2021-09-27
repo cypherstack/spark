@@ -4,20 +4,24 @@ import util
 
 class TestAEAD(unittest.TestCase):
 	def test_encrypt_decrypt(self):
-		ciphertext = util.aead_encrypt_utf8('key','header','plaintext')
-		plaintext = util.aead_decrypt_utf8('key','header',ciphertext)
-		self.assertEqual(plaintext,'plaintext')
+		ciphertext = util.aead_encrypt('key','header','plaintext'.encode('utf-8'))
+		plaintext_bytes = util.aead_decrypt('key','header',ciphertext)
+		if plaintext_bytes is not None:
+			plaintext = plaintext_bytes.decode('utf-8')
+			self.assertEqual(plaintext,'plaintext')
+		else:
+			raise ArithmeticError('Bad decryption!')
 
 		with self.assertRaises(TagInvalidException):
-			util.aead_decrypt_utf8('evil_key','header',ciphertext)
+			util.aead_decrypt('evil_key','header',ciphertext)
 		with self.assertRaises(TagInvalidException):
-			util.aead_decrypt_utf8('key','evil header',ciphertext)
+			util.aead_decrypt('key','evil header',ciphertext)
 		with self.assertRaises(TagInvalidException):
 			evil_ciphertext = ciphertext[:-1]
-			util.aead_decrypt_utf8('evil_key','header',evil_ciphertext)
+			util.aead_decrypt('evil_key','header',evil_ciphertext)
 		with self.assertRaises(TagInvalidException):
 			evil_ciphertext = ciphertext[1:]
-			util.aead_decrypt_utf8('evil_key','header',evil_ciphertext)
+			util.aead_decrypt('evil_key','header',evil_ciphertext)
 
 if __name__ == '__main__':
 	unittest.main()
