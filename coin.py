@@ -6,7 +6,7 @@ import bpplus
 import util
 
 class CoinParameters:
-	def __init__(self,F,G,H,U,N):
+	def __init__(self,F,G,H,U,value_bytes,memo_bytes):
 		if not isinstance(F,Point):
 			raise TypeError('Bad type for parameter F!')
 		if not isinstance(G,Point):
@@ -15,14 +15,17 @@ class CoinParameters:
 			raise TypeError('Bad type for parameter H!')
 		if not isinstance(U,Point):
 			raise TypeError('Bad type for parameter U!')
-		if not isinstance(N,int) or N < 1:
-			raise ValueError('Bad type or value for parameter N!')
+		if not isinstance(value_bytes,int) or value_bytes < 1:
+			raise ValueError('Bad type or value for parameter value_bytes!')
+		if not isinstance(memo_bytes,int) or memo_bytes < 1:
+			raise ValueError('Bad type or value for parameter memo_bytes!')
 		
 		self.F = F
 		self.G = G
 		self.H = H
 		self.U = U
-		self.N = N
+		self.value_bytes = value_bytes
+		self.memo_bytes = memo_bytes
 
 class CoinDelegation:
 	def __init__(self,id,s1,S1,c1,C1):
@@ -49,7 +52,7 @@ class Coin:
 				self.S,
 				self.C,
 				self.value,
-				self.memo_enc
+				self.enc
 			))
 		else:
 			return repr(hash_to_scalar(
@@ -57,8 +60,7 @@ class Coin:
 				self.S,
 				self.C,
 				self.range,
-				self.value_enc,
-				self.memo_enc
+				self.enc
 			))
 
 	def __init__(self,params,public,value,memo,is_mint,is_output):
@@ -66,10 +68,10 @@ class Coin:
 			raise TypeError('Bad type for parameters!')
 		if not isinstance(public,address.PublicAddress):
 			raise TypeError('Bad type for coin address!')
-		if not isinstance(value,int) or value < 0 or value >= 2**params.N:
+		if not isinstance(value,int) or value < 0 or value.bit_length() > 8*params.value_bytes:
 			raise ValueError('Bad type or value for coin value!')
-		if not isinstance(memo,str):
-			raise TypeError('Bad type for coin memo!')
+		if not isinstance(memo,str) or len(memo.encode('utf-8')) > params.memo_bytes:
+			raise ValueError('Bad type or size for coin memo!')
 		if not isinstance(is_mint,bool):
 			raise TypeError('Bad type for coin mint flag!')
 		if not isinstance(is_output,bool):
@@ -87,16 +89,19 @@ class Coin:
 		self.C = Scalar(value)*params.G + hash_to_scalar('val',K_der)*params.H
 		if not is_mint:
 			self.range = bpplus.prove(
-				bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,params.N),PointVector([self.C])),
+				bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,8*params.value_bytes),PointVector([self.C])),
 				bpplus.RangeWitness(ScalarVector([Scalar(value)]),ScalarVector([hash_to_scalar('val',K_der)]))
 			)
 
-		# Encrypt value and memo
+		# Encrypt recipient data
+		padded_memo = memo.encode('utf-8')
+		padded_memo += bytearray(params.memo_bytes - len(padded_memo))
 		if is_mint:
-			self.value = Scalar(value)
+			self.value = value
+			self.enc = util.aead_encrypt(K_der,'Mint recipient data',padded_memo)
 		else:
-			self.value_enc = util.aead_encrypt_utf8(K_der,'Spark coin value',repr(Scalar(value)))
-		self.memo_enc = util.aead_encrypt_utf8(K_der,'Spark coin memo',memo)
+			padded_value = value.to_bytes(params.value_bytes,'little')
+			self.enc = util.aead_encrypt(K_der,'Spend recipient data',padded_value + padded_memo)
 
 		# Data used for output only
 		self.is_output = False
@@ -104,8 +109,9 @@ class Coin:
 			self.is_output = True
 			self.k = k
 			self.Q1 = public.Q1
-			self.value = Scalar(value)
+			self.value = value
 
+		self.identified = False
 		self.recovered = False
 		self.is_mint = is_mint
 	
@@ -123,21 +129,33 @@ class Coin:
 		if not self.S == hash_to_scalar('ser',K_der,public.Q1,public.Q2)*params.F + public.Q2:
 			raise ArithmeticError('Coin does not belong to this public address!')
 		
-		# Decrypt value and memo
-		if not self.is_mint:
-			self.value = Scalar(util.aead_decrypt_utf8(K_der,'Spark coin value',self.value_enc))
-		self.memo = util.aead_decrypt_utf8(K_der,'Spark coin memo',self.memo_enc)
-		
+		# Decrypt recipient data
+		if self.is_mint:
+			memo_bytes = util.aead_decrypt(K_der,'Mint recipient data',self.enc)
+			if memo_bytes is not None:
+				self.memo = memo_bytes.decode('utf-8').rstrip('\x00')
+			else:
+				raise ArithmeticError('Bad recipient data!')
+		else:
+			data_bytes = util.aead_decrypt(K_der,'Spend recipient data',self.enc)
+			if data_bytes is not None:
+				self.value = int.from_bytes(data_bytes[:params.value_bytes],'little')
+				self.memo = data_bytes[params.value_bytes:].decode('utf-8').rstrip('\x00')
+			else:
+				raise ArithmeticError('Bad recipient data!')
+
 		# Test for value commitment
-		if not self.C == self.value*params.G + hash_to_scalar('val',K_der)*params.H:
+		if not self.C == Scalar(self.value)*params.G + hash_to_scalar('val',K_der)*params.H:
 			raise ArithmeticError('Bad coin value commitment!')
 		
 		# Test range proof
 		if not self.is_mint:
 			bpplus.verify(
-				[bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,params.N),PointVector([self.C]))],
+				[bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,8*params.value_bytes),PointVector([self.C]))],
 				[self.range]
 			)
+		
+		self.identified = True
 		
 	def recover(self,params,public,full):
 		if not isinstance(params,CoinParameters):
@@ -147,27 +165,11 @@ class Coin:
 		if not isinstance(full,address.FullViewKey):
 			raise TypeError('Bad type for full view key!')
 		
+		# The coin must be identified
+		if not self.identified:
+			raise ArithmeticError('Coin has not been identified!')
+		
 		K_der = full.s1*self.K
-		
-		# Test for ownership
-		if not self.S == hash_to_scalar('ser',K_der,public.Q1,public.Q2)*params.F + public.Q2:
-			raise ArithmeticError('Coin does not belong to this public address!')
-		
-		# Decrypt value and memo
-		if not self.is_mint:
-			self.value = Scalar(util.aead_decrypt_utf8(K_der,'Spark coin value',self.value_enc))
-		self.memo = util.aead_decrypt_utf8(K_der,'Spark coin memo',self.memo_enc)
-		
-		# Test for value commitment
-		if not self.C == self.value*params.G + hash_to_scalar('val',K_der)*params.H:
-			raise ArithmeticError('Bad coin value commitment!')
-		
-		# Test range proof
-		if not self.is_mint:
-			bpplus.verify(
-				[bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,params.N),PointVector([self.C]))],
-				[self.range]
-			)
 		
 		# Recover serial number and generate tag
 		self.s = hash_to_scalar('ser',K_der,public.Q1,public.Q2) + full.s2
@@ -186,6 +188,6 @@ class Coin:
 		s1 = hash_to_scalar('ser1',id,self.s,full.s1,full.s2)
 		S1 = self.s*params.F - hash_to_scalar('ser1',id,self.s,full.s1,full.s2)*params.H + full.D
 		c1 = hash_to_scalar('val',full.s1*self.K) - hash_to_scalar('val1',id,self.s,full.s1,full.s2)
-		C1 = self.value*params.G + hash_to_scalar('val1',id,self.s,full.s1,full.s2)*params.H
+		C1 = Scalar(self.value)*params.G + hash_to_scalar('val1',id,self.s,full.s1,full.s2)*params.H
 
 		self.delegation = CoinDelegation(id,s1,S1,c1,C1)
