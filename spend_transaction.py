@@ -88,8 +88,10 @@ class SpendTransaction:
 			self.parallel.append(parallel.prove(
 				parallel.ParallelStatement(
 					parallel.ParallelParameters(params.H,params.n,params.m),
-					PointVector([input.S - self.S1[u] for input in inputs]),
-					PointVector([input.C - self.C1[u] for input in inputs])
+					PointVector([input.S for input in inputs]),
+					PointVector([input.C for input in inputs]),
+					self.S1[u],
+					self.C1[u]
 				),
 				parallel.ParallelWitness(
 					indexes[u],
@@ -172,8 +174,10 @@ class SpendTransaction:
 			parallel.verify(
 				parallel.ParallelStatement(
 					parallel.ParallelParameters(params.H,params.n,params.m),
-					PointVector([input.S - self.S1[u] for input in self.inputs]),
-					PointVector([input.C - self.C1[u] for input in self.inputs])
+					PointVector([input.S for input in self.inputs]),
+					PointVector([input.C for input in self.inputs]),
+					self.S1[u],
+					self.C1[u]
 				),
 				self.parallel[u]
 			)

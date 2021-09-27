@@ -1,6 +1,6 @@
 # Parallel compressed one-of-many Groth/Bootle-type proving system
 #
-# {F,{S,V} ; (l,s,v) | S_l = sF, V_l = vF}
+# {F,{S,V},S1,V1 ; (l,s,v) | S_l - S1 = sF, V_l - V1 = vF}
 
 from dumb25519 import *
 import transcript
@@ -19,7 +19,7 @@ class ParallelCompressedParameters:
 		self.m = m
 
 class ParallelCompressedStatement:
-	def __init__(self,params,S,V):
+	def __init__(self,params,S,V,S1,V1):
 		if not isinstance(params,ParallelCompressedParameters):
 			raise TypeError('Bad type for parameters!')
 		n = params.n
@@ -28,12 +28,18 @@ class ParallelCompressedStatement:
 			raise TypeError('Bad type or length for parallel statement input S!')
 		if not isinstance(V,PointVector) or not len(V) == n**m:
 			raise TypeError('Bad type or length for parallel statement input V!')
+		if not isinstance(S1,Point):
+			raise TypeError('Bad type for parallel statement input S1!')
+		if not isinstance(V1,Point):
+			raise TypeError('Bad type for parallel statement input V1!')
 		
 		self.F = params.F
 		self.n = n
 		self.m = m
 		self.S = S
 		self.V = V
+		self.S1 = S1
+		self.V1 = V1
 		self.Gi = [PointVector([hash_to_point('Gi',j,i) for i in range(n)]) for j in range(m)]
 
 class ParallelCompressedWitness:
@@ -146,9 +152,9 @@ def prove(statement,witness):
 
 	if l < 0 or l >= N:
 		raise IndexError('Invalid parallel witness!')
-	if not statement.S[l] == witness.s*statement.F:
+	if not statement.S[l] - statement.S1 == witness.s*statement.F:
 		raise ArithmeticError('Invalid parallel statement!')
-	if not statement.S[l] == witness.s*statement.F:
+	if not statement.V[l] - statement.V1 == witness.v*statement.F:
 		raise ArithmeticError('Invalid parallel statement!')
 	
 	# Begin the proof
@@ -203,6 +209,8 @@ def prove(statement,witness):
 	tr.update(m)
 	tr.update(statement.S)
 	tr.update(statement.V)
+	tr.update(statement.S1)
+	tr.update(statement.V1)
 	tr.update(A)
 	tr.update(B)
 	tr.update(C)
@@ -214,7 +222,7 @@ def prove(statement,witness):
 	rho = ScalarVector([random_scalar() for _ in range(m)])
 	for j in range(m):
 		for i in range(N):
-			G[j] += (statement.S[i] + mu*statement.V[i])*p[i][j]
+			G[j] += ((statement.S[i] - statement.S1) + mu*(statement.V[i] - statement.V1))*p[i][j]
 		G[j] += rho[j]*statement.F
 
 	# Challenge
@@ -254,6 +262,8 @@ def verify(statement,proof):
 	tr.update(m)
 	tr.update(statement.S)
 	tr.update(statement.V)
+	tr.update(statement.S1)
+	tr.update(statement.V1)
 	tr.update(proof.A)
 	tr.update(proof.B)
 	tr.update(proof.C)
@@ -284,6 +294,8 @@ def verify(statement,proof):
 	# Commitment check
 	scalars = ScalarVector([])
 	points = PointVector([])
+	scalar_S1 = Scalar(0)
+	scalar_V1 = Scalar(0)
 	for i in range(N):
 		s = Scalar(1)
 		decomp_i = decompose(i,n,m)
@@ -293,9 +305,15 @@ def verify(statement,proof):
 		points.append(statement.S[i])
 		scalars.append(mu*s)
 		points.append(statement.V[i])
+		scalar_S1 -= s
+		scalar_V1 -= mu*s
 	for j in range(m):
 		scalars.append(-x**j)
 		points.append(proof.G[j])
+	scalars.append(scalar_S1)
+	points.append(statement.S1)
+	scalars.append(scalar_V1)
+	points.append(statement.V1)
 	if not multiexp(scalars,points) == proof.z*statement.F:
 		raise ArithmeticError('Failed parallel commitment check!')
 
