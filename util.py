@@ -1,6 +1,6 @@
 # Utility functions
 
-from chacha20poly1305 import ChaCha20Poly1305
+from chacha20poly1305 import ChaCha20Poly1305, TagInvalidException
 from hashlib import blake2s
 
 def aead_encrypt(prekey,header,plaintext):

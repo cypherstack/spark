@@ -79,11 +79,11 @@ class Coin:
 
 		# Recovery key
 		k = random_scalar()
-		self.K = k*params.F
+		self.K = k*public.Q0
 		K_der = k*public.Q1
 
 		# Serial number commitment
-		self.S = hash_to_scalar('ser',K_der,public.Q1,public.Q2)*params.F + public.Q2
+		self.S = hash_to_scalar('ser',K_der)*params.F + public.Q2
 
 		# Value commitment
 		self.C = Scalar(value)*params.G + hash_to_scalar('val',K_der)*params.H
@@ -96,12 +96,13 @@ class Coin:
 		# Encrypt recipient data
 		padded_memo = memo.encode('utf-8')
 		padded_memo += bytearray(params.memo_bytes - len(padded_memo))
+		aead_key = hash_to_scalar('aead',K_der,k*params.F)
 		if is_mint:
 			self.value = value
-			self.enc = util.aead_encrypt(K_der,'Mint recipient data',padded_memo)
+			self.enc = util.aead_encrypt(aead_key,'Mint recipient data',padded_memo)
 		else:
 			padded_value = value.to_bytes(params.value_bytes,'little')
-			self.enc = util.aead_encrypt(K_der,'Spend recipient data',padded_value + padded_memo)
+			self.enc = util.aead_encrypt(aead_key,'Spend recipient data',padded_value + padded_memo)
 
 		# Data used for output only
 		self.is_output = False
@@ -111,33 +112,36 @@ class Coin:
 			self.Q1 = public.Q1
 			self.value = value
 
+		self.diversifier = None
 		self.identified = False
 		self.recovered = False
 		self.is_mint = is_mint
 	
-	def identify(self,params,public,incoming):
+	def identify(self,params,incoming):
 		if not isinstance(params,CoinParameters):
 			raise TypeError('Bad type for parameters!')
-		if not isinstance(public,address.PublicAddress):
-			raise TypeError('Bad type for public address!')
 		if not isinstance(incoming,address.IncomingViewKey):
 			raise TypeError('Bad type for incoming view key!')
 	
 		K_der = incoming.s1*self.K
 		
-		# Test for ownership
-		if not self.S == hash_to_scalar('ser',K_der,public.Q1,public.Q2)*params.F + public.Q2:
+		# Test for diversifier
+		Q2 = self.S - hash_to_scalar('ser',K_der)*params.F
+		try:
+			self.diversifier = incoming.get_diversifier(Q2)
+		except:
 			raise ArithmeticError('Coin does not belong to this public address!')
 		
-		# Decrypt recipient data
+		# Decrypt recipient data; check for diversified address consistency
+		aead_key = hash_to_scalar('aead',K_der,(hash_to_scalar('div',incoming.s1,self.diversifier) + incoming.s1).invert()*self.K)
 		if self.is_mint:
-			memo_bytes = util.aead_decrypt(K_der,'Mint recipient data',self.enc)
+			memo_bytes = util.aead_decrypt(aead_key,'Mint recipient data',self.enc)
 			if memo_bytes is not None:
 				self.memo = memo_bytes.decode('utf-8').rstrip('\x00')
 			else:
 				raise ArithmeticError('Bad recipient data!')
 		else:
-			data_bytes = util.aead_decrypt(K_der,'Spend recipient data',self.enc)
+			data_bytes = util.aead_decrypt(aead_key,'Spend recipient data',self.enc)
 			if data_bytes is not None:
 				self.value = int.from_bytes(data_bytes[:params.value_bytes],'little')
 				self.memo = data_bytes[params.value_bytes:].decode('utf-8').rstrip('\x00')
@@ -157,11 +161,9 @@ class Coin:
 		
 		self.identified = True
 		
-	def recover(self,params,public,full):
+	def recover(self,params,full):
 		if not isinstance(params,CoinParameters):
 			raise TypeError('Bad type for coin parameters!')
-		if not isinstance(public,address.PublicAddress):
-			raise TypeError('Bad type for public address!')
 		if not isinstance(full,address.FullViewKey):
 			raise TypeError('Bad type for full view key!')
 		
@@ -169,10 +171,9 @@ class Coin:
 		if not self.identified:
 			raise ArithmeticError('Coin has not been identified!')
 		
-		K_der = full.s1*self.K
-		
 		# Recover serial number and generate tag
-		self.s = hash_to_scalar('ser',K_der,public.Q1,public.Q2) + full.s2
+		K_der = full.s1*self.K
+		self.s = hash_to_scalar('ser',K_der) + hash_to_scalar('div',full.s1,self.diversifier) + full.s2
 		self.T = self.s.invert()*(params.U - full.D)
 
 		self.recovered = True
