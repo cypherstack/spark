@@ -47,11 +47,9 @@ class SpendKey:
 		if not isinstance(i,int) or not i >= 0 or not i <= self.params.lookahead:
 			raise TypeError('Bad type or value for diversifier!')
 		
-		diversifier = hash_to_scalar('div',self.s1,i)
-
-		Q0 = (diversifier + self.s1)*self.params.F
+		Q0 = hash_to_scalar('Q0',self.s1,i)*self.params.F
 		Q1 = self.s1*Q0
-		Q2 = (diversifier + self.s2)*self.params.F + self.r*self.params.G
+		Q2 = (hash_to_scalar('Q2',self.s1,i) + self.s2)*self.params.F + self.r*self.params.G
 
 		return PublicAddress(Q0,Q1,Q2)
 
@@ -91,7 +89,7 @@ class IncomingViewKey:
 		self.table = {}
 	
 		for i in range(self.params.lookahead+1):
-			entry = hash_to_scalar('div',self.s1,i)*self.params.F + base.Q2
+			entry = hash_to_scalar('Q2',self.s1,i)*self.params.F + base.Q2
 			self.table[repr(entry)] = i
 
 	def get_diversifier(self,Q2):

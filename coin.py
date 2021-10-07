@@ -133,7 +133,7 @@ class Coin:
 			raise ArithmeticError('Coin does not belong to this public address!')
 		
 		# Decrypt recipient data; check for diversified address consistency
-		aead_key = hash_to_scalar('aead',K_der,(hash_to_scalar('div',incoming.s1,self.diversifier) + incoming.s1).invert()*self.K)
+		aead_key = hash_to_scalar('aead',K_der,hash_to_scalar('Q0',incoming.s1,self.diversifier).invert()*self.K)
 		if self.is_mint:
 			memo_bytes = util.aead_decrypt(aead_key,'Mint recipient data',self.enc)
 			if memo_bytes is not None:
@@ -173,7 +173,7 @@ class Coin:
 		
 		# Recover serial number and generate tag
 		K_der = full.s1*self.K
-		self.s = hash_to_scalar('ser',K_der) + hash_to_scalar('div',full.s1,self.diversifier) + full.s2
+		self.s = hash_to_scalar('ser',K_der) + hash_to_scalar('Q2',full.s1,self.diversifier) + full.s2
 		self.T = self.s.invert()*(params.U - full.D)
 
 		self.recovered = True
