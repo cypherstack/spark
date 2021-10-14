@@ -1,5 +1,4 @@
 import address
-from chacha20poly1305 import TagInvalidException
 import coin
 from dumb25519 import random_point
 from random import randrange
@@ -65,7 +64,7 @@ class TestCoin(unittest.TestCase):
 			coin_.S = coin_.S - public_0.Q2 + public_1.Q2
 
 			# Identification should fail
-			with self.assertRaises(TagInvalidException):
+			with self.assertRaises(ArithmeticError):
 				coin_.identify(coin_params,incoming)
 
 			# Recovery should fail

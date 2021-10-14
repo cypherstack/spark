@@ -16,7 +16,7 @@ class TestPay(unittest.TestCase):
 		coin_ = coin.Coin(coin_params,public,1,'Test memo',False,True)
 
 		witness = pay.PayWitness(coin_.k)
-		statement = pay.PayStatement(pay_params,'Proof context',coin_,coin_.k*public.Q1,coin_.k*coin_params.F,public)
+		statement = pay.PayStatement(pay_params,'Proof context',coin_,coin_.k*public.Q1,coin_.k*address_params.F,public)
 
 		proof = pay.prove(statement,witness)
 		pay.verify(statement,proof)

@@ -3,6 +3,7 @@
 from dumb25519 import Point, Scalar, PointVector, ScalarVector, random_scalar, hash_to_scalar
 import address
 import bpplus
+import schnorr
 import util
 
 class CoinParameters:
@@ -52,7 +53,8 @@ class Coin:
 				self.S,
 				self.C,
 				self.value,
-				self.enc
+				self.enc,
+				self.janus
 			))
 		else:
 			return repr(hash_to_scalar(
@@ -60,7 +62,8 @@ class Coin:
 				self.S,
 				self.C,
 				self.range,
-				self.enc
+				self.enc,
+				self.janus
 			))
 
 	def __init__(self,params,public,value,memo,is_mint,is_output):
@@ -92,11 +95,17 @@ class Coin:
 				bpplus.RangeStatement(bpplus.RangeParameters(params.G,params.H,8*params.value_bytes),PointVector([self.C])),
 				bpplus.RangeWitness(ScalarVector([Scalar(value)]),ScalarVector([hash_to_scalar('val',K_der)]))
 			)
+		
+		# Diversifier assertion
+		self.janus = schnorr.prove(
+			schnorr.SchnorrStatement(schnorr.SchnorrParameters(params.F),k*params.F),
+			schnorr.SchnorrWitness(k)
+		)
 
 		# Encrypt recipient data
 		padded_memo = memo.encode('utf-8')
 		padded_memo += bytearray(params.memo_bytes - len(padded_memo))
-		aead_key = hash_to_scalar('aead',K_der,k*params.F)
+		aead_key = hash_to_scalar('aead',K_der)
 		if is_mint:
 			self.value = value
 			self.enc = util.aead_encrypt(aead_key,'Mint recipient data',padded_memo)
@@ -129,11 +138,15 @@ class Coin:
 		Q2 = self.S - hash_to_scalar('ser',K_der)*params.F
 		try:
 			self.diversifier = incoming.get_diversifier(Q2)
+			schnorr.verify(
+				schnorr.SchnorrStatement(schnorr.SchnorrParameters(params.F),hash_to_scalar('Q0',incoming.s1,self.diversifier).invert()*self.K),
+				self.janus
+			)
 		except:
 			raise ArithmeticError('Coin does not belong to this public address!')
 		
 		# Decrypt recipient data; check for diversified address consistency
-		aead_key = hash_to_scalar('aead',K_der,hash_to_scalar('Q0',incoming.s1,self.diversifier).invert()*self.K)
+		aead_key = hash_to_scalar('aead',K_der)
 		if self.is_mint:
 			memo_bytes = util.aead_decrypt(aead_key,'Mint recipient data',self.enc)
 			if memo_bytes is not None:
