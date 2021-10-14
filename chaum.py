@@ -56,19 +56,16 @@ class ChaumProof:
 		return repr(hash_to_scalar(
 			self.A1,
 			self.A2,
-			self.A3,
 			self.t1,
 			self.t2,
 			self.t3
 		))
 
-	def __init__(self,A1,A2,A3,t1,t2,t3):
+	def __init__(self,A1,A2,t1,t2,t3):
 		if not isinstance(A1,Point):
 			raise TypeError('Bad type for Chaum proof element A1!')
 		if not isinstance(A2,Point):
 			raise TypeError('Bad type for Chaum proof element A2!')
-		if not isinstance(A3,Point):
-			raise TypeError('Bad type for Chaum proof element A3!')
 		if not isinstance(t1,Scalar):
 			raise TypeError('Bad type for Chaum proof element t1!')
 		if not isinstance(t2,Scalar):
@@ -78,20 +75,17 @@ class ChaumProof:
 
 		self.A1 = A1
 		self.A2 = A2
-		self.A3 = A3
 		self.t1 = t1
 		self.t2 = t2
 		self.t3 = t3
 
-def challenge(statement,A1,A2,A3):
+def challenge(statement,A1,A2):
 	if not isinstance(statement,ChaumStatement):
 		raise TypeError('Bad type for Chaum statement!')
 	if not isinstance(A1,Point):
 		raise TypeError('Bad type for challenge input A1!')
 	if not isinstance(A2,Point):
 		raise TypeError('Bad type for challenge input A2!')
-	if not isinstance(A3,Point):
-		raise TypeError('4ad type for challenge input A3!')
 
 	tr = transcript.Transcript('Modified Chaum')
 	tr.update(statement.F)
@@ -103,7 +97,6 @@ def challenge(statement,A1,A2,A3):
 	tr.update(statement.T)
 	tr.update(A1)
 	tr.update(A2)
-	tr.update(A3)
 	return tr.challenge()
 
 def prove(statement,witness):
@@ -122,17 +115,16 @@ def prove(statement,witness):
 	s = random_scalar()
 	t = random_scalar()
 
-	A1 = r*statement.F + s*statement.G
+	A1 = r*statement.F + s*statement.G + t*statement.H
 	A2 = r*statement.T + s*statement.G
-	A3 = t*statement.H
 
-	c = challenge(statement,A1,A2,A3)
+	c = challenge(statement,A1,A2)
 
 	t1 = r + c*witness.x
 	t2 = s + c*witness.y
 	t3 = t + c*witness.z
 
-	return ChaumProof(A1,A2,A3,t1,t2,t3)
+	return ChaumProof(A1,A2,t1,t2,t3)
 
 def verify(statement,proof):
 	if not isinstance(statement,ChaumStatement):
@@ -140,9 +132,9 @@ def verify(statement,proof):
 	if not isinstance(proof,ChaumProof):
 		raise TypeError('Bad type for Chaum proof!')
 	
-	c = challenge(statement,proof.A1,proof.A2,proof.A3)
+	c = challenge(statement,proof.A1,proof.A2)
 
-	if not proof.A1 + proof.A3 + c*statement.S == proof.t1*statement.F + proof.t2*statement.G + proof.t3*statement.H:
+	if not proof.A1 + c*statement.S == proof.t1*statement.F + proof.t2*statement.G + proof.t3*statement.H:
 		raise ArithmeticError('Failed Chaum verification!')
 	if not proof.A2 + c*statement.U == proof.t1*statement.T + proof.t2*statement.G:
 		raise ArithmeticError('Failed Chaum verification!')
