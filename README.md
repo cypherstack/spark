@@ -18,7 +18,7 @@ Install all required non-standard packages: `pip3 install -r requirements.txt`
 
 A test workflow in this repository runs against all active Python 3 release minor versions.
 
-![Test status](../../actions/workflows/test.yml/badge.svg)
+[![Test status](../../actions/workflows/test.yml/badge.svg)](../../actions/workflows/test.yml)
 
 Run the test suite locally using either:
 - `python3 -m unittest discover`
