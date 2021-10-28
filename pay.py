@@ -3,6 +3,7 @@
 # {(F,G,H),S,C,K,K_der,K_div,Q_0,Q_1,Q_2,v' ; k | 
 #		K = k*Q_0,
 #		K_der = k*Q_1,
+#		K_div = k*F,
 #		S = H_ser(K_der)F + Q_2,
 #		C = SymDec(H_aead_val(K_der),v')G + H_val(K_der)H
 # }
@@ -62,25 +63,30 @@ class PayWitness:
 		self.k = k
 
 class PayProof:
-	def __init__(self,A1,A2,t):
+	def __init__(self,A1,A2,A3,t):
 		if not isinstance(A1,Point):
 			raise TypeError('Bad type for pay proof element A1!')
 		if not isinstance(A2,Point):
 			raise TypeError('Bad type for pay proof element A2!')
+		if not isinstance(A3,Point):
+			raise TypeError('Bad type for pay proof element A3!')
 		if not isinstance(t,Scalar):
 			raise TypeError('Bad type for pay proof element t!')
 
 		self.A1 = A1
 		self.A2 = A2
+		self.A3 = A3
 		self.t = t
 
-def challenge(statement,A1,A2):
+def challenge(statement,A1,A2,A3):
 	if not isinstance(statement,PayStatement):
 		raise TypeError('Bad type for pay statement!')
 	if not isinstance(A1,Point):
 		raise TypeError('Bad type for challenge input A1!')
 	if not isinstance(A2,Point):
 		raise TypeError('Bad type for challenge input A2!')
+	if not isinstance(A3,Point):
+		raise TypeError('Bad type for challenge input A3!')
 
 	tr = transcript.Transcript('Pay proof')
 	tr.update(statement.F)
@@ -99,6 +105,7 @@ def challenge(statement,A1,A2):
 	tr.update(statement.public.Q2)
 	tr.update(A1)
 	tr.update(A2)
+	tr.update(A3)
 	return tr.challenge()
 
 def prove(statement,witness):
@@ -111,6 +118,8 @@ def prove(statement,witness):
 	if not statement.coin.K == witness.k*statement.public.Q0:
 		raise ArithmeticError('Invalid pay statement!')
 	if not statement.K_der == witness.k*statement.public.Q1:
+		raise ArithmeticError('Invalid pay statement!')
+	if not statement.K_div == witness.k*statement.F:
 		raise ArithmeticError('Invalid pay statement!')
 	if not statement.coin.S == hash_to_scalar('ser',statement.K_der)*statement.F + statement.public.Q2:
 		raise ArithmeticError('Invalid pay statement!')
@@ -130,12 +139,13 @@ def prove(statement,witness):
 
 	A1 = r*statement.public.Q0
 	A2 = r*statement.public.Q1
+	A3 = r*statement.F
 
-	c = challenge(statement,A1,A2)
+	c = challenge(statement,A1,A2,A3)
 
 	t = r + c*witness.k
 
-	return PayProof(A1,A2,t)
+	return PayProof(A1,A2,A3,t)
 
 def verify(statement,proof):
 	if not isinstance(statement,PayStatement):
@@ -143,13 +153,13 @@ def verify(statement,proof):
 	if not isinstance(proof,PayProof):
 		raise TypeError('Bad type for pay proof!')
 	
-	c = challenge(statement,proof.A1,proof.A2)
+	c = challenge(statement,proof.A1,proof.A2,proof.A3)
 
 	if not proof.A1 + c*statement.coin.K == proof.t*statement.public.Q0:
 		raise ArithmeticError('Failed pay verification!')
 	if not proof.A2 + c*statement.K_der == proof.t*statement.public.Q1:
 		raise ArithmeticError('Failed pay verification!')
-	if not statement.coin.S == hash_to_scalar('ser',statement.K_der)*statement.F + statement.public.Q2:
+	if not proof.A3 + c*statement.K_div == proof.t*statement.F:
 		raise ArithmeticError('Failed pay verification!')
 
 	# Decrypt recipient data
