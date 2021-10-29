@@ -4,6 +4,7 @@ from dumb25519 import Point, Scalar, PointVector, ScalarVector, random_scalar, h
 import address
 import bpplus
 import schnorr
+import siphash
 import util
 
 class CoinParameters:
@@ -54,7 +55,8 @@ class Coin:
 				self.C,
 				self.value,
 				self.enc,
-				self.janus
+				self.janus,
+				self.view_tag
 			))
 		else:
 			return repr(hash_to_scalar(
@@ -63,7 +65,8 @@ class Coin:
 				self.C,
 				self.range,
 				self.enc,
-				self.janus
+				self.janus,
+				self.view_tag
 			))
 
 	def __init__(self,params,public,value,memo,is_mint,is_output):
@@ -84,6 +87,9 @@ class Coin:
 		k = random_scalar()
 		self.K = k*public.Q0
 		K_der = k*public.Q1
+
+		# View tag
+		self.view_tag = siphash.SipHash_2_4(bytes.fromhex(repr(K_der))[:16],'Spark view tag'.encode('utf-8')).digest()[:1]
 
 		# Serial number commitment
 		self.S = hash_to_scalar('ser',K_der)*params.F + public.Q2
@@ -134,6 +140,10 @@ class Coin:
 	
 		K_der = incoming.s1*self.K
 		
+		# View tag
+		if siphash.SipHash_2_4(bytes.fromhex(repr(K_der))[:16],'Spark view tag'.encode('utf-8')).digest()[:1] != self.view_tag:
+			raise ArithmeticError('View tag does not match!')
+
 		# Test for diversifier
 		Q2 = self.S - hash_to_scalar('ser',K_der)*params.F
 		try:
