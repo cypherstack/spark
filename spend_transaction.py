@@ -5,7 +5,7 @@ import bpplus
 import chaum
 import coin
 import dumb25519
-from dumb25519 import Point, Scalar, PointVector, hash_to_scalar
+from dumb25519 import Point, Scalar, PointVector, ScalarVector, hash_to_scalar
 import parallel
 import schnorr
 
@@ -71,7 +71,6 @@ class SpendTransaction:
 		self.C1 = PointVector() # value commitment offsets
 		self.T = PointVector() # tags
 		self.parallel = [] # parallel one-of-many proofs
-		self.chaum = [] # modified Chaum-Pedersen proofs
 
 		# Spends
 		for u in range(w):
@@ -122,7 +121,7 @@ class SpendTransaction:
 			schnorr.SchnorrWitness(b_w)
 		)
 
-		# Modified Chaum-Pedersen proofs
+		# Aggregated modified Chaum-Pedersen proof
 		mu = hash_to_scalar(
 			self.inputs,
 			self.outputs,
@@ -134,13 +133,13 @@ class SpendTransaction:
 			self.balance
 		)
 
-		for u in range(w):
-			input = inputs[indexes[u]]
-			self.chaum.append(chaum.prove(
-				chaum.ChaumStatement(chaum.ChaumParameters(params.F,params.G,params.H,params.U),mu,self.S1[u],input.T),
-				chaum.ChaumWitness(input.s,spend.r,Scalar(0) - hash_to_scalar('ser1',input.delegation.id,input.s,full.s1,full.s2))
-			))
-		
+		chaum_x = ScalarVector([inputs[indexes[u]].s for u in range(w)])
+		chaum_y = ScalarVector([spend.r]*w)
+		chaum_z = ScalarVector([Scalar(0) - hash_to_scalar('ser1',inputs[indexes[u]].delegation.id,inputs[indexes[u]].s,full.s1,full.s2) for u in range(w)])
+		self.chaum = chaum.prove(
+			chaum.ChaumStatement(chaum.ChaumParameters(params.F,params.G,params.H,params.U),mu,self.S1,self.T),
+			chaum.ChaumWitness(chaum_x,chaum_y,chaum_z)
+		)
 
 	def verify(self,params,tags=None):
 		if not isinstance(params,ProtocolParameters):
@@ -182,10 +181,10 @@ class SpendTransaction:
 				self.parallel[u]
 			)
 
-			chaum.verify(
-				chaum.ChaumStatement(chaum.ChaumParameters(params.F,params.G,params.H,params.U),mu,self.S1[u],self.T[u]),
-				self.chaum[u]
-			)
+		chaum.verify(
+			chaum.ChaumStatement(chaum.ChaumParameters(params.F,params.G,params.H,params.U),mu,self.S1,self.T),
+			self.chaum
+		)
 		
 		# Check output proofs
 		for j in range(t):

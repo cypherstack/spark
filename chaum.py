@@ -1,8 +1,6 @@
-# Modified Chaum proving system
-#
-# {(F,G,H,U),S,T ; (x,y,z) | S = xF + yG + zH, U = xT + yG}
+# Aggregated modified Chaum proving system
 
-from dumb25519 import Point, Scalar, hash_to_scalar, random_scalar
+from dumb25519 import Z, Point, PointVector, Scalar, ScalarVector, hash_to_scalar, random_scalar
 import transcript
 
 class ChaumParameters:
@@ -25,10 +23,12 @@ class ChaumStatement:
 	def __init__(self,params,context,S,T):
 		if not isinstance(params,ChaumParameters):
 			raise TypeError('Bad type for parameters!')
-		if not isinstance(S,Point):
+		if not isinstance(S,PointVector):
 			raise TypeError('Bad type for Chaum statement input S!')
-		if not isinstance(T,Point):
+		if not isinstance(T,PointVector):
 			raise TypeError('Bad type for Chaum statement input T!')
+		if not len(S) == len(T):
+			raise ValueError('Size mismatch for Chaum statement!')
 		
 		self.F = params.F
 		self.G = params.G
@@ -40,12 +40,14 @@ class ChaumStatement:
 
 class ChaumWitness:
 	def __init__(self,x,y,z):
-		if not isinstance(x,Scalar):
+		if not isinstance(x,ScalarVector):
 			raise TypeError('Bad type for Chaum witness x!')
-		if not isinstance(y,Scalar):
+		if not isinstance(y,ScalarVector):
 			raise TypeError('Bad type for Chaum witness y!')
-		if not isinstance(z,Scalar):
+		if not isinstance(z,ScalarVector):
 			raise TypeError('Bad type for Chaum witness z!')
+		if not len(x) == len(y) and len(y) == len(z):
+			raise ValueError('Size mismatch for Chaum witness!')
 		
 		self.x = x
 		self.y = y
@@ -64,14 +66,16 @@ class ChaumProof:
 	def __init__(self,A1,A2,t1,t2,t3):
 		if not isinstance(A1,Point):
 			raise TypeError('Bad type for Chaum proof element A1!')
-		if not isinstance(A2,Point):
+		if not isinstance(A2,PointVector):
 			raise TypeError('Bad type for Chaum proof element A2!')
-		if not isinstance(t1,Scalar):
+		if not isinstance(t1,ScalarVector):
 			raise TypeError('Bad type for Chaum proof element t1!')
 		if not isinstance(t2,Scalar):
 			raise TypeError('Bad type for Chaum proof element t2!')
 		if not isinstance(t3,Scalar):
 			raise TypeError('Bad type for Chaum proof element t3!')
+		if not len(A2) == len(t1):
+			raise ValueError('Size mismatch in Chaum proof!')
 
 		self.A1 = A1
 		self.A2 = A2
@@ -84,7 +88,7 @@ def challenge(statement,A1,A2):
 		raise TypeError('Bad type for Chaum statement!')
 	if not isinstance(A1,Point):
 		raise TypeError('Bad type for challenge input A1!')
-	if not isinstance(A2,Point):
+	if not isinstance(A2,PointVector):
 		raise TypeError('Bad type for challenge input A2!')
 
 	tr = transcript.Transcript('Modified Chaum')
@@ -105,24 +109,32 @@ def prove(statement,witness):
 	if not isinstance(witness,ChaumWitness):
 		raise TypeError('Bad type for Chaum witness!')
 	
-	# Check the statement validity
-	if not statement.S == witness.x*statement.F + witness.y*statement.G + witness.z*statement.H:
-		raise ArithmeticError('Invalid Chaum statement!')
-	if not statement.U == witness.x*statement.T + witness.y*statement.G:
-		raise ArithmeticError('Invalid Chaum statement!')
+	n = len(statement.S)
 	
-	r = random_scalar()
-	s = random_scalar()
+	# Check the statement validity
+	for i in range(n):
+		if not statement.S[i] == witness.x[i]*statement.F + witness.y[i]*statement.G + witness.z[i]*statement.H:
+			raise ArithmeticError('Invalid Chaum statement!')
+		if not statement.U == witness.x[i]*statement.T[i] + witness.y[i]*statement.G:
+			raise ArithmeticError('Invalid Chaum statement!')
+	
+	r = ScalarVector([random_scalar() for _ in range(n)])
+	s = ScalarVector([random_scalar() for _ in range(n)])
 	t = random_scalar()
 
-	A1 = r*statement.F + s*statement.G + t*statement.H
-	A2 = r*statement.T + s*statement.G
+	A1 = t*statement.H
+	for i in range(n):
+		A1 += r[i]*statement.F + s[i]*statement.G
+	A2 = PointVector([r[i]*statement.T[i] + s[i]*statement.G for i in range(n)])
 
 	c = challenge(statement,A1,A2)
 
-	t1 = r + c*witness.x
-	t2 = s + c*witness.y
-	t3 = t + c*witness.z
+	t1 = ScalarVector([r[i] + c**i*witness.x[i] for i in range(n)])
+	t2 = Scalar(0)
+	t3 = t
+	for i in range(n):
+		t2 += s[i] + c**i*witness.y[i]
+		t3 += c**i*witness.z[i]
 
 	return ChaumProof(A1,A2,t1,t2,t3)
 
@@ -131,10 +143,25 @@ def verify(statement,proof):
 		raise TypeError('Bad type for Chaum statement!')
 	if not isinstance(proof,ChaumProof):
 		raise TypeError('Bad type for Chaum proof!')
+	if not len(proof.A2) == len(statement.S):
+		raise ValueError('Size mismatch in Chaum verification!')
+	
+	n = len(statement.S)
 	
 	c = challenge(statement,proof.A1,proof.A2)
 
-	if not proof.A1 + c*statement.S == proof.t1*statement.F + proof.t2*statement.G + proof.t3*statement.H:
+	L = proof.A1
+	R = proof.t2*statement.G + proof.t3*statement.H
+	for i in range(n):
+		L += c**i*statement.S[i]
+		R += proof.t1[i]*statement.F
+	if not L == R:
 		raise ArithmeticError('Failed Chaum verification!')
-	if not proof.A2 + c*statement.U == proof.t1*statement.T + proof.t2*statement.G:
+	
+	L = Z
+	R = proof.t2*statement.G
+	for i in range(n):
+		L += proof.A2[i] + c**i*statement.U
+		R += proof.t1[i]*statement.T[i]
+	if not L == R:
 		raise ArithmeticError('Failed Chaum verification!')
