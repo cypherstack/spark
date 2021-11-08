@@ -129,12 +129,12 @@ def prove(statement,witness):
 
 	c = challenge(statement,A1,A2)
 
-	t1 = ScalarVector([r[i] + c**i*witness.x[i] for i in range(n)])
+	t1 = ScalarVector([r[i] + c**(i+1)*witness.x[i] for i in range(n)])
 	t2 = Scalar(0)
 	t3 = t
 	for i in range(n):
-		t2 += s[i] + c**i*witness.y[i]
-		t3 += c**i*witness.z[i]
+		t2 += s[i] + c**(i+1)*witness.y[i]
+		t3 += c**(i+1)*witness.z[i]
 
 	return ChaumProof(A1,A2,t1,t2,t3)
 
@@ -153,7 +153,7 @@ def verify(statement,proof):
 	L = proof.A1
 	R = proof.t2*statement.G + proof.t3*statement.H
 	for i in range(n):
-		L += c**i*statement.S[i]
+		L += c**(i+1)*statement.S[i]
 		R += proof.t1[i]*statement.F
 	if not L == R:
 		raise ArithmeticError('Failed Chaum verification!')
@@ -161,7 +161,7 @@ def verify(statement,proof):
 	L = Z
 	R = proof.t2*statement.G
 	for i in range(n):
-		L += proof.A2[i] + c**i*statement.U
+		L += proof.A2[i] + c**(i+1)*statement.U
 		R += proof.t1[i]*statement.T[i]
 	if not L == R:
 		raise ArithmeticError('Failed Chaum verification!')
