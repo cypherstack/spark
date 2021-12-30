@@ -10,7 +10,7 @@ class TestMint(unittest.TestCase):
 		address_params = address.AddressParameters(protocol_params.F,protocol_params.G)
 
 		# Mint data
-		public = address.PublicAddress(address_params,address.SpendKey())
+		public = address.SpendKey(address_params).public_address()
 		value = randrange(0,2**(8*protocol_params.value_bytes))
 		memo = 'Mint memo'
 

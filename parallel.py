@@ -1,6 +1,6 @@
 # Parallel one-of-many Groth/Bootle-type proving system
 #
-# {F,{S,V} ; (l,s,v) | S_l = sF, V_l = vF}
+# {F,{S,V},S1,V1 ; (l,s,v) | S_l - S1 = sF, V_l - V1 = vF}
 
 from dumb25519 import *
 import transcript
@@ -19,7 +19,7 @@ class ParallelParameters:
 		self.m = m
 
 class ParallelStatement:
-	def __init__(self,params,S,V):
+	def __init__(self,params,S,V,S1,V1):
 		if not isinstance(params,ParallelParameters):
 			raise TypeError('Bad type for parameters!')
 		n = params.n
@@ -28,12 +28,18 @@ class ParallelStatement:
 			raise TypeError('Bad type or length for parallel statement input S!')
 		if not isinstance(V,PointVector) or not len(V) == n**m:
 			raise TypeError('Bad type or length for parallel statement input V!')
+		if not isinstance(S1,Point):
+			raise TypeError('Bad type for parallel statement input S1!')
+		if not isinstance(V1,Point):
+			raise TypeError('Bad type for parallel statement input V1!')
 		
 		self.F = params.F
 		self.n = n
 		self.m = m
 		self.S = S
 		self.V = V
+		self.S1 = S1
+		self.V1 = V1
 		self.Gi = [PointVector([hash_to_point('Gi',j,i) for i in range(n)]) for j in range(m)]
 
 class ParallelWitness:
@@ -154,9 +160,9 @@ def prove(statement,witness):
 
 	if l < 0 or l >= N:
 		raise IndexError('Invalid parallel witness!')
-	if not statement.S[l] == witness.s*statement.F:
+	if not statement.S[l] - statement.S1 == witness.s*statement.F:
 		raise ArithmeticError('Invalid parallel statement!')
-	if not statement.S[l] == witness.s*statement.F:
+	if not statement.V[l] - statement.V1 == witness.v*statement.F:
 		raise ArithmeticError('Invalid parallel statement!')
 	
 	# Begin the proof
@@ -211,8 +217,8 @@ def prove(statement,witness):
 	rho_V = ScalarVector([random_scalar() for _ in range(m)])
 	for j in range(m):
 		for i in range(N):
-			Gs[j] += statement.S[i]*p[i][j]
-			Gv[j] += statement.V[i]*p[i][j]
+			Gs[j] += (statement.S[i] - statement.S1)*p[i][j]
+			Gv[j] += (statement.V[i] - statement.V1)*p[i][j]
 		Gs[j] += rho_S[j]*statement.F
 		Gv[j] += rho_V[j]*statement.F
 
@@ -223,6 +229,8 @@ def prove(statement,witness):
 	tr.update(m)
 	tr.update(statement.S)
 	tr.update(statement.V)
+	tr.update(statement.S1)
+	tr.update(statement.V1)
 	tr.update(A)
 	tr.update(B)
 	tr.update(C)
@@ -267,6 +275,8 @@ def verify(statement,proof):
 	tr.update(m)
 	tr.update(statement.S)
 	tr.update(statement.V)
+	tr.update(statement.S1)
+	tr.update(statement.V1)
 	tr.update(proof.A)
 	tr.update(proof.B)
 	tr.update(proof.C)
@@ -300,6 +310,7 @@ def verify(statement,proof):
 	points_S = PointVector([])
 	scalars_V = ScalarVector([])
 	points_V = PointVector([])
+	scalar_S1_V1 = Scalar(0)
 	for i in range(N):
 		s = Scalar(1)
 		decomp_i = decompose(i,n,m)
@@ -309,11 +320,17 @@ def verify(statement,proof):
 		scalars_V.append(s)
 		points_S.append(statement.S[i])
 		points_V.append(statement.V[i])
+		scalar_S1_V1 -= s
 	for j in range(m):
 		scalars_S.append(-x**j)
 		points_S.append(proof.Gs[j])
 		scalars_V.append(-x**j)
 		points_V.append(proof.Gv[j])
+	scalars_S.append(scalar_S1_V1)
+	scalars_V.append(scalar_S1_V1)
+	points_S.append(statement.S1)
+	points_V.append(statement.V1)
+	
 	if not multiexp(scalars_S,points_S) == proof.zS*statement.F or not multiexp(scalars_V,points_V) == proof.zV*statement.F:
 		raise ArithmeticError('Failed parallel commitment check!')
 

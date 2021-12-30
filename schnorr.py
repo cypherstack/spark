@@ -1,4 +1,4 @@
-# Schnorr discrete logarithm proof
+# Schnorr discrete logarithm proof (shortened)
 #
 # {G,Y ; (y) | Y = yG}
 
@@ -32,17 +32,17 @@ class SchnorrWitness:
 class SchnorrProof:
 	def __repr__(self):
 		return repr(hash_to_scalar(
-			self.A,
+			self.c,
 			self.t
 		))
 
-	def __init__(self,A,t):
-		if not isinstance(A,Point):
-			raise TypeError('Bad type for Schnorr proof element A!')
+	def __init__(self,c,t):
+		if not isinstance(c,Scalar):
+			raise TypeError('Bad type for Schnorr proof element c!')
 		if not isinstance(t,Scalar):
 			raise TypeError('Bad type for Schnorr proof element t!')
 		
-		self.A = A
+		self.c = c # In practice, only the first half of the corresponding byte array is stored
 		self.t = t
 
 def challenge(statement,A):
@@ -55,7 +55,11 @@ def challenge(statement,A):
 	tr.update(statement.G)
 	tr.update(statement.Y)
 	tr.update(A)
-	return tr.challenge()
+
+	# Return a challenge of half length (uses hex representation)
+	x = tr.challenge()
+	length = len(repr(x))//2
+	return Scalar(repr(x)[0:length] + '0'*length)
 
 def prove(statement,witness):
 	if not isinstance(statement,SchnorrStatement):
@@ -75,7 +79,7 @@ def prove(statement,witness):
 
 	t = r + c*witness.y
 
-	return SchnorrProof(A,t)
+	return SchnorrProof(c,t)
 
 def verify(statement,proof):
 	if not isinstance(statement,SchnorrStatement):
@@ -83,7 +87,7 @@ def verify(statement,proof):
 	if not isinstance(proof,SchnorrProof):
 		raise TypeError('Bad type for Schnorr proof!')
 	
-	c = challenge(statement,proof.A)
+	c = challenge(statement,proof.t*statement.G - proof.c*statement.Y)
 
-	if not proof.A + c*statement.Y == proof.t*statement.G:
+	if not proof.c == c:
 		raise ArithmeticError('Failed Schnorr verification!')

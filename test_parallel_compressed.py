@@ -15,9 +15,11 @@ class TestParallelCompressed(unittest.TestCase):
 		
 		S = PointVector([random_point() for _ in range(N)])
 		V = PointVector([random_point() for _ in range(N)])
-		S[l] = s*params.F
-		V[l] = v*params.F
-		statement = parallel_compressed.ParallelCompressedStatement(params,S,V)
+		S1 = random_point()
+		V1 = random_point()
+		S[l] = s*params.F + S1
+		V[l] = v*params.F + V1
+		statement = parallel_compressed.ParallelCompressedStatement(params,S,V,S1,V1)
 
 		proof = parallel_compressed.prove(statement,witness)
 		parallel_compressed.verify(statement,proof)
