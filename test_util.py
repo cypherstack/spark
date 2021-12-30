@@ -1,4 +1,5 @@
 from chacha20poly1305 import TagInvalidException
+from dumb25519 import random_scalar
 import unittest
 import util
 
@@ -22,6 +23,10 @@ class TestAEAD(unittest.TestCase):
 		with self.assertRaises(TagInvalidException):
 			evil_ciphertext = ciphertext[1:]
 			util.aead_decrypt('evil_key','header',evil_ciphertext)
+
+class TestViewTag(unittest.TestCase):
+	def test_view_tag(self):
+		util.view_tag(random_scalar())
 
 if __name__ == '__main__':
 	unittest.main()

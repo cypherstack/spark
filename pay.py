@@ -7,7 +7,7 @@
 #		S = H_ser(K_der)F + Q_2,
 #		C = SymDec(H_aead_val(K_der),v')G + H_val(K_der)H
 # }
-# Also require that memo decryption succeeds under the key H_aead_memo(K_der), and that the diversifier assertion holds for K_div
+# Also require that memo decryption succeeds under the key H_aead_memo(K_der), that the view tag is correct, and that the diversifier assertion holds for K_div
 
 import address
 import coin
@@ -98,6 +98,7 @@ def challenge(statement,A1,A2,A3):
 	tr.update(statement.coin.C)
 	tr.update(statement.coin.K)
 	tr.update(statement.coin.enc)
+	tr.update(statement.coin.view_tag)
 	tr.update(statement.K_der)
 	tr.update(statement.K_div)
 	tr.update(statement.public.Q0)
@@ -122,6 +123,8 @@ def prove(statement,witness):
 	if not statement.K_div == witness.k*statement.F:
 		raise ArithmeticError('Invalid pay statement!')
 	if not statement.coin.S == hash_to_scalar('ser',statement.K_der)*statement.F + statement.public.Q2:
+		raise ArithmeticError('Invalid pay statement!')
+	if util.view_tag(statement.K_der) != statement.coin.view_tag:
 		raise ArithmeticError('Invalid pay statement!')
 
 	# Decrypt recipient data
@@ -160,6 +163,10 @@ def verify(statement,proof):
 	if not proof.A2 + c*statement.K_der == proof.t*statement.public.Q1:
 		raise ArithmeticError('Failed pay verification!')
 	if not proof.A3 + c*statement.K_div == proof.t*statement.F:
+		raise ArithmeticError('Failed pay verification!')
+	
+	# Test view tag
+	if util.view_tag(statement.K_der) != statement.coin.view_tag:
 		raise ArithmeticError('Failed pay verification!')
 
 	# Decrypt recipient data
